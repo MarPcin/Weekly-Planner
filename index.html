@@ -2,10 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#0F1117" />
 <title>Weekly Planner</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%236366F1%22/><text x=%2250%22 y=%2266%22 font-size=%2255%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22>P</text></svg>" />
+
+<!-- iOS "Add to Home Screen" support -->
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Weekly" />
 <style>
   :root {
     --bg: #0F1117;
@@ -23,7 +29,7 @@
     --priority-standard: #F0F0FF;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
   body {
     margin: 0;
     background: var(--bg);
@@ -37,21 +43,28 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh; /* real iOS viewport height, excludes Safari's collapsing toolbar/keyboard area */
     max-width: 640px;
     margin: 0 auto;
     background: var(--bg);
     border-left: 1px solid var(--border);
     border-right: 1px solid var(--border);
+    overflow: hidden; /* the page itself never scrolls - only .day-list does, so the header can't scroll away */
   }
 
   /* ---------- Header ---------- */
   .header {
-    display: flex;
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
     align-items: center;
     gap: 6px;
     padding: 12px 12px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: var(--bg);
   }
   .icon-btn {
     width: 36px; height: 36px;
@@ -62,10 +75,18 @@
   }
   .icon-btn:hover { background: var(--surface-elevated); }
   .icon-btn.active { background: var(--accent-soft); color: var(--accent); }
-  .header-center { flex: 1; text-align: center; }
-  .header-title { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-center {
+    text-align: center; background: none; border: none; border-radius: 10px;
+    padding: 4px 8px; cursor: pointer;
+  }
+  .header-center:hover { background: var(--surface-elevated); }
+  .header-title {
+    font-size: 18px; font-weight: 800; letter-spacing: -0.4px;
+    background: linear-gradient(120deg, var(--accent), #9b9dfb);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
   .header-week { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
-  .header-right { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .header-right { display: flex; align-items: center; gap: 2px; flex-shrink: 0; justify-self: end; }
   .today-btn {
     padding: 6px 12px; border-radius: 16px;
     background: var(--accent-soft); color: var(--accent);
@@ -79,6 +100,10 @@
     padding: 8px 10px 8px 14px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    position: sticky;
+    top: 60px; /* sits directly under the fixed header's height */
+    z-index: 29;
+    background: var(--bg);
   }
   .filter-scroll {
     flex: 1; min-width: 0;
@@ -137,24 +162,52 @@
 
   /* ---------- Task row ---------- */
   .task-list { display: flex; flex-direction: column; gap: 5px; }
+  .task-row-outer {
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+  }
+  .swipe-panel {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 72px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px;
+    color: #fff;
+  }
+  .swipe-panel.edit { left: 0; background: var(--accent); }
+  .swipe-panel.delete { right: 0; background: var(--danger); }
   .task-row {
     display: flex; align-items: center;
     background: var(--surface);
     border-radius: 10px;
     min-height: 44px;
-    overflow: hidden;
+    position: relative;
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
-  .task-row.completed { opacity: .45; }
+  .task-row.completed { background: var(--surface); }
+  .task-row.completed .priority-bar,
+  .task-row.completed .task-emoji,
+  .task-row.completed .recurrence-icon,
+  .task-row.completed .task-number,
+  .task-row.completed .subtask-badge { opacity: .4; }
   .priority-bar { width: 3px; align-self: stretch; border-radius: 1.5px; flex-shrink: 0; }
   .task-number { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-left: 8px; min-width: 16px; flex-shrink: 0; }
   .task-emoji { font-size: 14px; margin: 0 6px; flex-shrink: 0; }
   .recurrence-icon { font-size: 10px; margin-right: 3px; color: var(--text-muted); flex-shrink: 0; }
   .task-title {
     flex: 1; min-width: 0; font-size: 14px; font-weight: 500;
-    padding: 10px 6px; line-height: 19px; cursor: pointer;
-    background: none; border: none; text-align: left; color: var(--text);
+    padding: 10px 6px; line-height: 19px;
+    color: var(--text);
+    background: none; border: none; text-align: left; cursor: pointer;
   }
   .task-row.completed .task-title { text-decoration: line-through; color: var(--text-muted); }
+  .desc-badge {
+    font-size: 13px; color: var(--text-muted); margin-right: 6px; flex-shrink: 0;
+  }
   .subtask-badge {
     display: flex; align-items: center; gap: 3px;
     background: var(--surface-elevated); border-radius: 8px;
@@ -175,6 +228,61 @@
     margin-right: 10px; flex-shrink: 0; font-size: 12px; font-weight: 700;
   }
 
+  /* ---------- Expandable task details panel ---------- */
+  .task-details { transition: max-height .25s ease; }
+  .task-details-inner { padding: 10px 4px 2px 4px; }
+  .td-section-label {
+    font-size: 10px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .9px; margin: 12px 0 6px;
+  }
+  .td-section-label:first-child { margin-top: 0; }
+  .td-empty { font-size: 12px; color: var(--text-muted); font-style: italic; }
+  .td-subtask-outer { position: relative; overflow: hidden; border-radius: 8px; margin-bottom: 5px; }
+  .td-swipe-panel {
+    position: absolute; top: 0; bottom: 0; width: 56px;
+    display: flex; align-items: center; justify-content: center; font-size: 15px; color: #fff;
+  }
+  .td-swipe-panel.edit { left: 0; background: var(--accent); }
+  .td-swipe-panel.delete { right: 0; background: var(--danger); }
+  .td-subtask-row {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface-elevated); border-radius: 8px; padding: 7px 9px;
+    position: relative; touch-action: pan-y;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+  .td-subtask-check {
+    width: 19px; height: 19px; border-radius: 10px; border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; color: var(--accent);
+  }
+  .td-subtask-check.done { border-color: var(--accent); background: var(--accent-soft); }
+  .td-subtask-text { flex: 1; font-size: 13px; color: var(--text); word-break: break-word; }
+  .td-subtask-text.done { text-decoration: line-through; color: var(--text-muted); }
+  .td-subtask-edit-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--accent); border-radius: 6px;
+    padding: 4px 7px; font-size: 16px; color: var(--text); outline: none;
+  }
+  .td-description { font-size: 13px; color: var(--text-secondary); line-height: 19px; white-space: pre-wrap; }
+  .td-move-row { display: flex; gap: 8px; align-items: center; }
+  .td-move-buttons { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+  .td-move-btn {
+    padding: 7px 11px; border-radius: 8px; background: var(--surface-elevated);
+    border: 1px solid var(--border); color: var(--text-secondary); font-size: 12px; font-weight: 600;
+  }
+  .td-move-cal-btn {
+    width: 34px; height: 34px; border-radius: 8px; background: var(--surface-elevated);
+    border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+  }
+
+  /* ---------- Confirm dialog ---------- */
+  .confirm-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+  .confirm-btn {
+    width: 100%; padding: 13px; border-radius: 12px;
+    font-size: 14px; font-weight: 700; text-align: center;
+  }
+  .confirm-btn.neutral { background: var(--surface-elevated); color: var(--text-secondary); border: 1px solid var(--border); }
+  .confirm-btn.danger { background: var(--danger); color: #fff; }
+
   /* ---------- Notes ---------- */
   .notes-container {
     border-top: 1px solid var(--border);
@@ -187,7 +295,7 @@
   .notes-textarea {
     width: 100%; height: 64px; resize: none;
     background: none; border: none; outline: none;
-    font-size: 14px; color: var(--text); line-height: 20px;
+    font-size: 16px; color: var(--text); line-height: 22px;
   }
   .notes-textarea::placeholder { color: var(--text-muted); }
 
@@ -225,6 +333,7 @@
   }
   .option-pill.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
   .option-pill .dot { width: 9px; height: 9px; border-radius: 5px; flex-shrink: 0; }
+  #recurrenceRow .option-pill { font-size: 12px; padding: 9px 3px; }
   .category-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
   .category-option {
     width: 22%; flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -249,7 +358,7 @@
   .subtask-text.done { text-decoration: line-through; color: var(--text-muted); }
   .subtask-remove { color: var(--text-muted); font-size: 14px; flex-shrink: 0; padding: 2px; }
   .subtask-input-row { display: flex; gap: 8px; margin-top: 2px; }
-  .subtask-input-row .text-input { margin-bottom: 0; padding: 10px 12px; font-size: 13px; }
+  .subtask-input-row .text-input { margin-bottom: 0; padding: 10px 12px; font-size: 16px; }
   .subtask-add-btn {
     width: 38px; height: 38px; border-radius: 10px; background: var(--accent);
     color: #fff; font-size: 18px; font-weight: 700; flex-shrink: 0;
@@ -273,12 +382,27 @@
   .weekday-cell { flex: 1; text-align: center; font-size: 11px; font-weight: 600; color: var(--text-muted); letter-spacing: .5px; }
   .weekday-cell.weekend { color: var(--accent); opacity: .7; }
   .week-row { display: flex; border-radius: 10px; margin-bottom: 2px; padding: 3px 0; }
+  .week-row.current-week { background: var(--accent-soft); }
   .week-row:hover { background: var(--surface-elevated); }
   .week-row.selected { background: var(--accent-soft); }
-  .cal-day-cell { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .cal-day-cell { flex: 1; height: 40px; display: flex; align-items: center; justify-content: center; }
   .cal-day-inner { width: 32px; height: 32px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--text-secondary); font-weight: 500; }
   .cal-day-inner.today { background: var(--today); color: #0F1117; font-weight: 700; }
+  .cal-day-inner.selected { background: var(--accent); color: #fff; font-weight: 700; }
   .cal-day-inner.other-month { color: var(--text-muted); opacity: .4; }
+  .cal-day-inner.disabled { opacity: .2; }
+  .cal-day-inner.preview { box-shadow: 0 0 0 2px rgba(245, 158, 11, .55); }
+  .month-nav:disabled { cursor: default; }
+  .month-label-chevron { font-size: 11px; opacity: .65; }
+  .dp-weeks-viewport { overflow: hidden; }
+  #dpMonthGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
+  .month-grid-cell {
+    padding: 14px 4px; border-radius: 10px; text-align: center;
+    background: var(--surface-elevated); border: 1px solid var(--border);
+    color: var(--text); font-size: 13px; font-weight: 600;
+  }
+  .month-grid-cell.current { border-color: var(--today); }
+  .month-grid-cell.disabled { opacity: .25; }
 
   /* stats modal */
   .stats-progress-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
@@ -318,10 +442,10 @@
 <div id="app">
   <header class="header">
     <button class="icon-btn" id="openCalendarBtn" aria-label="Open month calendar">📅</button>
-    <div class="header-center">
-      <div class="header-title">Planner</div>
+    <button class="header-center" id="headerCenterBtn" aria-label="Jump to a date">
+      <div class="header-title">Weekly</div>
       <div class="header-week" id="weekLabel"></div>
-    </div>
+    </button>
     <div class="header-right">
       <button class="icon-btn" id="sortBtn" aria-label="Toggle sort by priority">📊</button>
       <button class="icon-btn today-btn" id="todayBtn" style="display:none;">Today</button>
@@ -351,15 +475,15 @@
 <!-- Task add/edit modal -->
 <div class="modal-backdrop hidden" id="taskModalBackdrop">
   <div class="modal-card sheet">
-    <p class="modal-subtitle" id="taskModalDay"></p>
+    <button class="modal-subtitle" id="taskModalDay" style="background:none;border:none;padding:0;display:flex;align-items:center;gap:4px;"></button>
     <h2 class="modal-title" id="taskModalTitle">New Task</h2>
 
     <input class="text-input" id="taskTitleInput" maxlength="120" placeholder="What do you need to do?" style="margin-top:14px;" />
 
     <p class="section-label">Priority</p>
     <div class="option-row" id="priorityRow">
-      <button class="option-pill" data-priority="high"><span class="dot" style="background:#EF4444"></span>High</button>
       <button class="option-pill" data-priority="standard"><span class="dot" style="background:#F0F0FF"></span>Standard</button>
+      <button class="option-pill" data-priority="high"><span class="dot" style="background:#EF4444"></span>High</button>
     </div>
 
     <p class="section-label">Category</p>
@@ -379,7 +503,22 @@
       <button class="option-pill" data-recurrence="none">Never</button>
       <button class="option-pill" data-recurrence="daily">Daily</button>
       <button class="option-pill" data-recurrence="weekly">Weekly</button>
+      <button class="option-pill" data-recurrence="monthly">Monthly</button>
     </div>
+
+    <div id="recurrenceUntilWrap" style="display:none; margin-bottom:18px;">
+      <p class="section-label">Repeat Until</p>
+      <div style="display:flex; gap:8px;">
+        <button class="text-input" id="recurrenceUntilBtn" style="flex:1; margin-bottom:0; text-align:left; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+          <span id="recurrenceUntilLabel">No end date</span>
+          <span>📅</span>
+        </button>
+        <button id="recurrenceUntilClear" class="mini-btn" style="display:none; width:44px; height:44px; border-radius:10px; background:var(--surface-elevated); border:1px solid var(--border); flex-shrink:0;" aria-label="Clear end date">✕</button>
+      </div>
+    </div>
+
+    <p class="section-label">Description (optional)</p>
+    <textarea class="text-input" id="taskDescInput" maxlength="1000" placeholder="Add more detail…" style="min-height:76px; resize:vertical; font-family:inherit;"></textarea>
 
     <div class="modal-actions">
       <button class="btn btn-cancel" id="taskModalCancel">Cancel</button>
@@ -389,27 +528,50 @@
   </div>
 </div>
 
-<!-- Month calendar modal -->
-<div class="modal-backdrop hidden" id="calendarModalBackdrop">
-  <div class="modal-card">
-    <div class="month-header">
-      <button class="month-nav" id="calPrevMonth">‹</button>
-      <div class="month-label" id="calMonthLabel"></div>
-      <button class="month-nav" id="calNextMonth">›</button>
-    </div>
-    <div class="weekday-row" id="calWeekdayRow"></div>
-    <div id="calWeeks"></div>
-    <button class="close-btn" id="calendarModalClose">Close</button>
-  </div>
-</div>
-
 <!-- Stats modal -->
 <div class="modal-backdrop hidden" id="statsModalBackdrop">
   <div class="modal-card">
-    <h2 class="modal-title">Podsumowanie tygodnia</h2>
+    <h2 class="modal-title">Week Summary</h2>
     <p class="modal-subtitle" id="statsWeekLabel"></p>
     <div id="statsContent"></div>
     <button class="close-btn" id="statsModalClose">Close</button>
+  </div>
+</div>
+
+<!-- Day picker modal (used when moving a task to a different day) -->
+<div class="modal-backdrop hidden" id="dayPickerModalBackdrop">
+  <div class="modal-card">
+    <!-- Day-of-month view -->
+    <div id="dpDayView">
+      <div class="month-header">
+        <button class="month-nav" id="dpPrevMonth" aria-label="Previous month">‹</button>
+        <button class="month-label" id="dpMonthLabel" style="background:none; border:none; cursor:pointer; padding:0; font-family:inherit; display:flex; align-items:center; gap:4px;"></button>
+        <button class="month-nav" id="dpNextMonth" aria-label="Next month">›</button>
+      </div>
+      <div class="weekday-row" id="dpWeekdayRow"></div>
+      <div class="dp-weeks-viewport">
+        <div id="dpWeeks"></div>
+      </div>
+    </div>
+    <!-- Month/year picker view -->
+    <div id="dpMonthView" style="display:none;">
+      <div class="month-header">
+        <button class="month-nav" id="dpMonthViewPrevYear" aria-label="Previous year">‹</button>
+        <div class="month-label" id="dpMonthViewYearLabel"></div>
+        <button class="month-nav" id="dpMonthViewNextYear" aria-label="Next year">›</button>
+      </div>
+      <div id="dpMonthGrid"></div>
+    </div>
+    <button class="close-btn" id="dayPickerModalClose">Close</button>
+  </div>
+</div>
+
+<!-- Confirm dialog (used for delete confirmation) -->
+<div class="modal-backdrop hidden" id="confirmModalBackdrop">
+  <div class="modal-card" style="max-width:340px;">
+    <h2 class="modal-title" id="confirmTitle"></h2>
+    <p class="modal-subtitle" id="confirmMessage" style="color:var(--text-secondary); font-weight:400; margin-bottom:16px;"></p>
+    <div class="confirm-actions" id="confirmActions"></div>
   </div>
 </div>
 
@@ -448,6 +610,7 @@
     sortByPriority: false,
     filterCategory: null,
     displayCache: [], // last computed list of real+virtual tasks, kept fresh every render
+    expandedTaskId: null, // id of the task whose details panel is open, if any
   };
 
   /* ============================== Date helpers ============================== */
@@ -517,14 +680,25 @@
       createdAt: t.createdAt || Date.now() + idx,
       order: typeof t.order === "number" ? t.order : idx,
       subtasks: Array.isArray(t.subtasks) ? t.subtasks : undefined,
-      recurrence: t.recurrence === "daily" || t.recurrence === "weekly" ? t.recurrence : undefined,
+      recurrence: (t.recurrence === "daily" || t.recurrence === "weekly" || t.recurrence === "monthly") ? t.recurrence : undefined,
       recurrenceId: t.recurrenceId || undefined,
+      recurrenceUntil: t.recurrenceUntil || undefined,
+      description: t.description || undefined,
       skipped: !!t.skipped,
     };
   }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
 
   /* ============================== Recurrence engine ============================== */
+  function isMonthlyMatch(day, startDate) {
+    // Clamp to the last day of the month for months shorter than the
+    // start day (e.g. a task created on the 31st recurs on Feb 28/29,
+    // Apr 30, etc. instead of being skipped entirely).
+    var lastDayOfMonth = new Date(day.getFullYear(), day.getMonth() + 1, 0).getDate();
+    var targetDom = Math.min(startDate.getDate(), lastDayOfMonth);
+    return day.getDate() === targetDom;
+  }
+
   function generateRecurringInstances(allTasks, weekDays) {
     var templates = allTasks.filter(function (t) { return t.recurrence && !t.skipped; });
     if (templates.length === 0) return [];
@@ -532,13 +706,17 @@
     templates.forEach(function (template) {
       var startDate = dateFromDayKey(template.dayKey);
       startDate.setHours(0, 0, 0, 0);
+      var untilDate = template.recurrenceUntil ? dateFromDayKey(template.recurrenceUntil) : null;
+      if (untilDate) untilDate.setHours(0, 0, 0, 0);
       weekDays.forEach(function (day) {
         var d = new Date(day); d.setHours(0, 0, 0, 0);
         var dayKey = formatDayKey(d);
         if (d.getTime() < startDate.getTime()) return;
+        if (untilDate && d.getTime() > untilDate.getTime()) return;
         if (dayKey === template.dayKey) return;
         var matches = template.recurrence === "daily" ||
-          (template.recurrence === "weekly" && d.getDay() === startDate.getDay());
+          (template.recurrence === "weekly" && d.getDay() === startDate.getDay()) ||
+          (template.recurrence === "monthly" && isMonthlyMatch(d, startDate));
         if (!matches) return;
         var already = allTasks.some(function (t) { return t.recurrenceId === template.id && t.dayKey === dayKey; });
         if (already) return;
@@ -582,9 +760,16 @@
     render();
   }
   function deleteTask(id) {
-    var wasVirtual = !state.tasks.some(function (t) { return t.id === id; });
     var list = materializeIfNeeded(id);
-    if (wasVirtual) {
+    var target = list.find(function (t) { return t.id === id; });
+    if (!target) { render(); return; }
+    // Any occurrence that belongs to a recurring series but isn't the
+    // template itself must be tombstoned (not hard-deleted), regardless of
+    // whether it happens to already be materialized (e.g. because opening
+    // the edit sheet materializes it first) - otherwise the recurrence
+    // engine sees no record for that day and instantly regenerates it.
+    var isRecurringInstance = !!target.recurrenceId && target.recurrenceId !== target.id;
+    if (isRecurringInstance) {
       saveTasks(list.map(function (t) { return t.id === id ? Object.assign({}, t, { skipped: true }) : t; }));
     } else {
       saveTasks(list.filter(function (t) { return t.id !== id; }));
@@ -697,43 +882,536 @@
     container.querySelectorAll("[data-toggle]").forEach(function (el) {
       el.addEventListener("click", function (e) { e.stopPropagation(); toggleTask(el.getAttribute("data-toggle")); });
     });
-    container.querySelectorAll("[data-edit]").forEach(function (el) {
-      el.addEventListener("click", function () { openTaskModal(el.getAttribute("data-edit")); });
-    });
-    container.querySelectorAll("[data-delete]").forEach(function (el) {
-      el.addEventListener("click", function (e) { e.stopPropagation(); deleteTask(el.getAttribute("data-delete")); });
-    });
     container.querySelectorAll("[data-move-up]").forEach(function (el) {
       el.addEventListener("click", function (e) { e.stopPropagation(); moveTask(el.getAttribute("data-move-up"), -1); });
     });
     container.querySelectorAll("[data-move-down]").forEach(function (el) {
       el.addEventListener("click", function (e) { e.stopPropagation(); moveTask(el.getAttribute("data-move-down"), 1); });
     });
+    container.querySelectorAll("[data-details-toggle]").forEach(function (el) {
+      el.addEventListener("click", function () { toggleTaskDetails(el.getAttribute("data-details-toggle")); });
+    });
+    attachSwipeHandlers(container);
+
+    // A full re-render (e.g. after any task mutation) rebuilds every row
+    // from scratch, so if a task's details panel was open, restore it
+    // instantly (no animation - this isn't a fresh user-initiated expand).
+    if (state.expandedTaskId) {
+      var stillVisible = document.getElementById("details-" + state.expandedTaskId);
+      if (stillVisible) {
+        expandDetails(state.expandedTaskId, false);
+      } else {
+        state.expandedTaskId = null;
+      }
+    }
   }
 
   function renderTaskRow(t, taskNumber, canReorder) {
     var catInfo = CATEGORY_MAP[t.category] || CATEGORY_MAP.other;
     var color = PRIORITY_COLORS[t.priority] || PRIORITY_COLORS.standard;
-    var html = '<div class="task-row' + (t.completed ? " completed" : "") + '">';
+    var html = '<div class="task-row-outer">';
+    html += '<div class="swipe-panel edit" data-swipe-edit="' + t.id + '">✏️</div>';
+    html += '<div class="swipe-panel delete" data-swipe-delete="' + t.id + '">🗑️</div>';
+    html += '<div class="task-row' + (t.completed ? " completed" : "") + '" data-swipe-id="' + t.id + '">';
     html += '<div class="priority-bar" style="background:' + color + '"></div>';
     if (taskNumber) html += '<span class="task-number">' + taskNumber + '.</span>';
     html += '<span class="task-emoji">' + catInfo.emoji + '</span>';
     if (t.recurrenceId) html += '<span class="recurrence-icon">🔁</span>';
-    html += '<button class="task-title" data-edit="' + t.id + '">' + escapeHtml(t.title) + '</button>';
+    html += '<button class="task-title" data-details-toggle="' + t.id + '">' + escapeHtml(t.title) + '</button>';
+    if (t.description) html += '<span class="desc-badge" title="Has a description">ⓘ</span>';
     if (t.subtasks && t.subtasks.length) {
       var done = t.subtasks.filter(function (s) { return s.completed; }).length;
       html += '<span class="subtask-badge">☑ ' + done + '/' + t.subtasks.length + '</span>';
     }
-    html += '<div class="task-actions">';
     if (canReorder) {
+      html += '<div class="task-actions">';
       html += '<button class="mini-btn" data-move-up="' + t.id + '" aria-label="Move up">▲</button>';
       html += '<button class="mini-btn" data-move-down="' + t.id + '" aria-label="Move down">▼</button>';
+      html += '</div>';
     }
-    html += '<button class="mini-btn" data-delete="' + t.id + '" aria-label="Delete">✕</button>';
-    html += '</div>';
     html += '<button class="check-btn" data-toggle="' + t.id + '" style="' + (t.completed ? ("border-color:" + color + ";background:" + color + "25;") : "") + '" aria-label="Mark as done">' + (t.completed ? "✓" : "") + '</button>';
+    html += '</div>'; // .task-row
+    html += '</div>'; // .task-row-outer
+    html += '<div class="task-details" id="details-' + t.id + '" style="max-height:0; overflow:hidden;"></div>';
+    return html;
+  }
+
+  /* ============================== Swipe engine (edit / delete reveal) ============================== */
+  var SWIPE_W = 72;
+
+  function attachSwipeHandlers(container) {
+    container.querySelectorAll(".task-row[data-swipe-id]").forEach(function (rowEl) {
+      var id = rowEl.getAttribute("data-swipe-id");
+      var outer = rowEl.closest(".task-row-outer");
+      var revealed = "none"; // "none" | "edit" | "delete"
+      var mode = "idle"; // "idle" | "swipe"
+      var startX = 0, startY = 0, baseX = 0;
+
+      function setX(px, animate) {
+        rowEl.style.transition = animate ? "transform .18s ease" : "none";
+        rowEl.style.transform = "translateX(" + px + "px)";
+      }
+      function snap(side) {
+        revealed = side;
+        var target = side === "delete" ? -SWIPE_W : side === "edit" ? SWIPE_W : 0;
+        setX(target, true);
+      }
+
+      rowEl.addEventListener("pointerdown", function (e) {
+        if (e.target.closest(".check-btn, .mini-btn, .task-title")) return;
+        mode = "idle";
+        startX = e.clientX;
+        startY = e.clientY;
+        baseX = revealed === "delete" ? -SWIPE_W : revealed === "edit" ? SWIPE_W : 0;
+        try { rowEl.setPointerCapture(e.pointerId); } catch (err) {}
+      });
+      rowEl.addEventListener("pointermove", function (e) {
+        var dx = e.clientX - startX;
+        var dy = e.clientY - startY;
+        if (mode === "idle") {
+          if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) mode = "swipe";
+          else return;
+        }
+        var next = Math.max(-SWIPE_W, Math.min(SWIPE_W, baseX + dx));
+        setX(next, false);
+      });
+      function endSwipe(e) {
+        if (mode === "swipe") {
+          var dx = e.clientX - startX;
+          var finalX = Math.max(-SWIPE_W, Math.min(SWIPE_W, baseX + dx));
+          if (finalX <= -SWIPE_W / 2) snap("delete");
+          else if (finalX >= SWIPE_W / 2) snap("edit");
+          else snap("none");
+        } else if (revealed !== "none") {
+          snap("none");
+        }
+        mode = "idle";
+      }
+      rowEl.addEventListener("pointerup", endSwipe);
+      rowEl.addEventListener("pointercancel", function () { mode = "idle"; snap("none"); });
+
+      var editBtn = outer.querySelector("[data-swipe-edit]");
+      var deleteBtn = outer.querySelector("[data-swipe-delete]");
+      editBtn.addEventListener("click", function () {
+        snap("none");
+        openTaskModal(id);
+      });
+      deleteBtn.addEventListener("click", function () {
+        requestDeleteConfirm(id, function () { snap("none"); });
+      });
+    });
+  }
+
+  /* ============================== Task details panel ============================== */
+
+  function toggleTaskDetails(id) {
+    if (state.expandedTaskId === id) {
+      state.expandedTaskId = null;
+      collapseDetails(id, true);
+    } else {
+      var prev = state.expandedTaskId;
+      state.expandedTaskId = id;
+      if (prev) collapseDetails(prev, true);
+      expandDetails(id, true);
+    }
+  }
+
+  function expandDetails(id, animate) {
+    var el = document.getElementById("details-" + id);
+    if (!el) return;
+    el.innerHTML = renderTaskDetailsContent(id);
+    wireTaskDetailsContent(id, el);
+    if (animate) {
+      el.style.transition = "none";
+      el.style.maxHeight = "0px";
+      void el.offsetHeight; // force reflow so the expand transition actually plays
+      var target = el.scrollHeight;
+      el.style.transition = "max-height .25s ease";
+      el.style.maxHeight = target + "px";
+      setTimeout(function () {
+        if (state.expandedTaskId === id) el.style.maxHeight = "none";
+      }, 260);
+    } else {
+      el.style.transition = "none";
+      el.style.maxHeight = "none";
+    }
+  }
+
+  function collapseDetails(id, animate) {
+    var el = document.getElementById("details-" + id);
+    if (!el) return;
+    if (animate) {
+      var current = el.scrollHeight;
+      el.style.transition = "none";
+      el.style.maxHeight = current + "px";
+      void el.offsetHeight;
+      el.style.transition = "max-height .2s ease";
+      el.style.maxHeight = "0px";
+    } else {
+      el.style.transition = "none";
+      el.style.maxHeight = "0px";
+    }
+  }
+
+  function findTaskAnywhere(id) {
+    return state.tasks.find(function (t) { return t.id === id; }) ||
+      state.displayCache.find(function (t) { return t.id === id; });
+  }
+
+  function renderTaskDetailsContent(id) {
+    var t = findTaskAnywhere(id);
+    if (!t) return "";
+    var html = '<div class="task-details-inner">';
+
+    html += '<p class="td-section-label">Checklist</p>';
+    if (t.subtasks && t.subtasks.length) {
+      t.subtasks.forEach(function (s) {
+        html += '<div class="td-subtask-outer">';
+        html += '<div class="td-swipe-panel edit" data-td-sub-edit="' + s.id + '">✏️</div>';
+        html += '<div class="td-swipe-panel delete" data-td-sub-delete="' + s.id + '">🗑️</div>';
+        html += '<div class="td-subtask-row" data-td-sub-swipe="' + s.id + '">';
+        html += '<button class="td-subtask-check' + (s.completed ? " done" : "") + '" data-td-sub-toggle="' + s.id + '">' + (s.completed ? "✓" : "") + '</button>';
+        html += '<span class="td-subtask-text' + (s.completed ? " done" : "") + '" data-td-sub-label="' + s.id + '">' + escapeHtml(s.title) + '</span>';
+        html += '</div></div>';
+      });
+    } else {
+      html += '<p class="td-empty">No checklist items.</p>';
+    }
+
+    if (t.description) {
+      html += '<p class="td-section-label">Description</p>';
+      html += '<p class="td-description">' + escapeHtml(t.description) + '</p>';
+    }
+
+    html += '<p class="td-section-label">Move to</p>';
+    html += '<div class="td-move-row">';
+    html += '<div class="td-move-buttons">';
+    html += '<button class="td-move-btn" data-td-move="nextday">Next day</button>';
+    var todayKey = formatDayKey(today);
+    if (t.dayKey > todayKey) {
+      html += '<button class="td-move-btn" data-td-move="prevday">The day before</button>';
+    }
+    html += '<button class="td-move-btn" data-td-move="sunday">Sunday</button>';
+    html += '<button class="td-move-btn" data-td-move="nextweek">Next week</button>';
+    html += '<button class="td-move-btn" data-td-move="nextweekend">Next weekend</button>';
+    html += '</div>';
+    html += '<button class="td-move-cal-btn" data-td-move-cal="1" aria-label="Pick a date">📅</button>';
+    html += '</div>';
+
     html += '</div>';
     return html;
+  }
+
+  function wireTaskDetailsContent(id, containerEl) {
+    containerEl.querySelectorAll("[data-td-sub-toggle]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        toggleSubtaskFromDetails(id, el.getAttribute("data-td-sub-toggle"));
+      });
+    });
+    containerEl.querySelectorAll("[data-td-sub-edit]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        startSubtaskInlineEdit(id, el.getAttribute("data-td-sub-edit"), containerEl);
+      });
+    });
+    containerEl.querySelectorAll("[data-td-sub-delete]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var subId = el.getAttribute("data-td-sub-delete");
+        var t = findTaskAnywhere(id);
+        var sub = t && t.subtasks ? t.subtasks.find(function (s) { return s.id === subId; }) : null;
+        showConfirm({
+          title: "Delete checklist item?",
+          message: sub ? sub.title : undefined,
+          buttons: [
+            { label: "Cancel", variant: "neutral", isCancel: true },
+            { label: "Delete", variant: "danger", onPress: function () { deleteSubtaskFromDetails(id, subId); } },
+          ],
+        });
+      });
+    });
+    containerEl.querySelectorAll("[data-td-sub-swipe]").forEach(function (rowEl) {
+      attachTdSubtaskSwipe(rowEl);
+    });
+    containerEl.querySelectorAll("[data-td-move]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        quickMoveTask(id, el.getAttribute("data-td-move"));
+      });
+    });
+    var calBtn = containerEl.querySelector("[data-td-move-cal]");
+    if (calBtn) {
+      calBtn.addEventListener("click", function () {
+        var t = findTaskAnywhere(id);
+        var info = (t && t.recurrence) ? { recurrence: t.recurrence, startDayKey: t.dayKey, untilDayKey: t.recurrenceUntil || null } : null;
+        openDayPicker("quickMove", info, id);
+      });
+    }
+  }
+
+  var TD_SWIPE_W = 56;
+
+  function attachTdSubtaskSwipe(rowEl) {
+    var outer = rowEl.closest(".td-subtask-outer");
+    var revealed = "none";
+    var mode = "idle";
+    var startX = 0, startY = 0, baseX = 0;
+
+    function setX(px, animate) {
+      rowEl.style.transition = animate ? "transform .16s ease" : "none";
+      rowEl.style.transform = "translateX(" + px + "px)";
+    }
+    function snap(side) {
+      revealed = side;
+      var target = side === "delete" ? -TD_SWIPE_W : side === "edit" ? TD_SWIPE_W : 0;
+      setX(target, true);
+    }
+
+    rowEl.addEventListener("pointerdown", function (e) {
+      if (e.target.closest(".td-subtask-check")) return;
+      mode = "idle";
+      startX = e.clientX; startY = e.clientY;
+      baseX = revealed === "delete" ? -TD_SWIPE_W : revealed === "edit" ? TD_SWIPE_W : 0;
+      try { rowEl.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    rowEl.addEventListener("pointermove", function (e) {
+      var dx = e.clientX - startX, dy = e.clientY - startY;
+      if (mode === "idle") {
+        if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) mode = "swipe";
+        else return;
+      }
+      var next = Math.max(-TD_SWIPE_W, Math.min(TD_SWIPE_W, baseX + dx));
+      setX(next, false);
+    });
+    function endSwipe(e) {
+      if (mode === "swipe") {
+        var dx = e.clientX - startX;
+        var finalX = Math.max(-TD_SWIPE_W, Math.min(TD_SWIPE_W, baseX + dx));
+        if (finalX <= -TD_SWIPE_W / 2) snap("delete");
+        else if (finalX >= TD_SWIPE_W / 2) snap("edit");
+        else snap("none");
+      } else if (revealed !== "none") {
+        snap("none");
+      }
+      mode = "idle";
+    }
+    rowEl.addEventListener("pointerup", endSwipe);
+    rowEl.addEventListener("pointercancel", function () { mode = "idle"; snap("none"); });
+  }
+
+  function startSubtaskInlineEdit(taskId, subId, containerEl) {
+    var rowEl = containerEl.querySelector('[data-td-sub-swipe="' + subId + '"]');
+    if (!rowEl) return;
+    rowEl.style.transition = "transform .16s ease";
+    rowEl.style.transform = "translateX(0px)";
+    var labelEl = rowEl.querySelector('[data-td-sub-label="' + subId + '"]');
+    if (!labelEl) return;
+    var currentText = labelEl.textContent;
+    var input = document.createElement("input");
+    input.type = "text";
+    input.className = "td-subtask-edit-input";
+    input.value = currentText;
+    input.maxLength = 80;
+    labelEl.replaceWith(input);
+    input.focus();
+    input.select();
+    var committed = false;
+    function commit() {
+      if (committed) return;
+      committed = true;
+      var newTitle = input.value.trim();
+      if (newTitle && newTitle !== currentText) {
+        updateSubtaskTitle(taskId, subId, newTitle);
+      } else if (state.expandedTaskId === taskId) {
+        expandDetails(taskId, false);
+      }
+    }
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+      if (e.key === "Escape") { input.value = currentText; input.blur(); }
+    });
+  }
+
+  function toggleSubtaskFromDetails(taskId, subId) {
+    var list = materializeIfNeeded(taskId);
+    var updated = list.map(function (t) {
+      if (t.id !== taskId) return t;
+      return Object.assign({}, t, {
+        subtasks: (t.subtasks || []).map(function (s) { return s.id === subId ? Object.assign({}, s, { completed: !s.completed }) : s; }),
+      });
+    });
+    saveTasks(updated);
+    render();
+  }
+
+  function updateSubtaskTitle(taskId, subId, newTitle) {
+    var list = materializeIfNeeded(taskId);
+    var updated = list.map(function (t) {
+      if (t.id !== taskId) return t;
+      return Object.assign({}, t, {
+        subtasks: (t.subtasks || []).map(function (s) { return s.id === subId ? Object.assign({}, s, { title: newTitle }) : s; }),
+      });
+    });
+    saveTasks(updated);
+    render();
+  }
+
+  function deleteSubtaskFromDetails(taskId, subId) {
+    var list = materializeIfNeeded(taskId);
+    var updated = list.map(function (t) {
+      if (t.id !== taskId) return t;
+      return Object.assign({}, t, { subtasks: (t.subtasks || []).filter(function (s) { return s.id !== subId; }) });
+    });
+    saveTasks(updated);
+    render();
+  }
+
+  function nextWeekdayAfter(fromDate, targetDow) {
+    var d = new Date(fromDate);
+    d.setDate(d.getDate() + 1);
+    while (d.getDay() !== targetDow) d.setDate(d.getDate() + 1);
+    return d;
+  }
+
+  function quickMoveTask(taskId, action) {
+    var t = findTaskAnywhere(taskId);
+    if (!t) return;
+    var base = dateFromDayKey(t.dayKey);
+    base.setHours(0, 0, 0, 0);
+    var target;
+    if (action === "nextday") {
+      target = new Date(base); target.setDate(target.getDate() + 1);
+    } else if (action === "prevday") {
+      target = new Date(base); target.setDate(target.getDate() - 1);
+    } else if (action === "sunday") {
+      target = nextWeekdayAfter(base, 0);
+    } else if (action === "nextweek") {
+      target = nextWeekdayAfter(base, 1);
+    } else if (action === "nextweekend") {
+      var firstSat = nextWeekdayAfter(base, 6);
+      target = new Date(firstSat);
+      target.setDate(target.getDate() + 7);
+    } else {
+      return;
+    }
+    moveTaskToDay(taskId, formatDayKey(target));
+  }
+
+  function moveTaskToDay(taskId, targetDayKey) {
+    var list = materializeIfNeeded(taskId);
+    var targetTask = list.find(function (t) { return t.id === taskId; });
+    if (!targetTask) return;
+    var newOrder = list
+      .filter(function (t) { return t.dayKey === targetDayKey && t.id !== taskId; })
+      .reduce(function (m, t) { return Math.max(m, t.order); }, -1) + 1;
+    var updated = list.map(function (t) {
+      return t.id === taskId ? Object.assign({}, t, { dayKey: targetDayKey, order: newOrder }) : t;
+    });
+    state.expandedTaskId = null;
+    saveTasks(updated);
+    render();
+  }
+
+  /* ============================== Confirm dialog ============================== */
+  var confirmCancelFn = null;
+
+  function showConfirm(opts) {
+    confirmCancelFn = null;
+    document.getElementById("confirmTitle").textContent = opts.title;
+    var msgEl = document.getElementById("confirmMessage");
+    if (opts.message) { msgEl.textContent = opts.message; msgEl.style.display = "block"; }
+    else { msgEl.style.display = "none"; }
+    var actionsEl = document.getElementById("confirmActions");
+    actionsEl.innerHTML = "";
+    opts.buttons.forEach(function (b) {
+      if (b.isCancel) confirmCancelFn = b.onPress || null;
+      var btn = document.createElement("button");
+      btn.className = "confirm-btn " + (b.variant || "neutral");
+      btn.textContent = b.label;
+      btn.addEventListener("click", function () {
+        closeConfirm();
+        confirmCancelFn = null;
+        if (b.onPress) b.onPress();
+      });
+      actionsEl.appendChild(btn);
+    });
+    document.getElementById("confirmModalBackdrop").classList.remove("hidden");
+  }
+  function closeConfirm() {
+    document.getElementById("confirmModalBackdrop").classList.add("hidden");
+  }
+  function cancelConfirm() {
+    var fn = confirmCancelFn;
+    confirmCancelFn = null;
+    closeConfirm();
+    if (fn) fn();
+  }
+
+  function requestDeleteConfirm(id, onCancel, onDeleted) {
+    var t = state.displayCache.find(function (x) { return x.id === id; });
+    if (!t) return;
+    if (t.recurrenceId) {
+      showConfirm({
+        title: "Delete recurring task",
+        message: "This task repeats. Delete just this occurrence, or this and every future occurrence? Earlier ones are kept either way.",
+        buttons: [
+          { label: "Cancel", variant: "neutral", isCancel: true, onPress: onCancel },
+          {
+            label: "This task", variant: "neutral", onPress: function () {
+              showConfirm({
+                title: "Delete this task?",
+                message: "This can't be undone.",
+                buttons: [
+                  { label: "Cancel", variant: "neutral", isCancel: true, onPress: onCancel },
+                  { label: "Delete", variant: "danger", onPress: function () { deleteTask(id); if (onDeleted) onDeleted(); } },
+                ],
+              });
+            }
+          },
+          {
+            label: "This and future", variant: "danger", onPress: function () {
+              showConfirm({
+                title: "Delete this and future occurrences?",
+                message: "Earlier occurrences are kept. This can't be undone.",
+                buttons: [
+                  { label: "Cancel", variant: "neutral", isCancel: true, onPress: onCancel },
+                  { label: "Delete", variant: "danger", onPress: function () { deleteTaskSeriesFrom(t.recurrenceId, t.dayKey); if (onDeleted) onDeleted(); } },
+                ],
+              });
+            }
+          },
+        ],
+      });
+    } else {
+      showConfirm({
+        title: "Delete task?",
+        message: "This can't be undone.",
+        buttons: [
+          { label: "Cancel", variant: "neutral", isCancel: true, onPress: onCancel },
+          { label: "Delete", variant: "danger", onPress: function () { deleteTask(id); if (onDeleted) onDeleted(); } },
+        ],
+      });
+    }
+  }
+
+  // Deletes this occurrence and every future occurrence of the series,
+  // but keeps the template and any earlier materialized instances intact.
+  // Does this by capping the template's recurrenceUntil to the day before
+  // fromDayKey, and removing any already-materialized instances on/after it.
+  function deleteTaskSeriesFrom(recurrenceId, fromDayKey) {
+    var dayBefore = formatDayKey(new Date(dateFromDayKey(fromDayKey).getTime() - 86400000));
+
+    var updated = state.tasks.filter(function (t) {
+      if (t.recurrenceId !== recurrenceId) return true;
+      return t.dayKey < fromDayKey;
+    });
+    updated = updated.map(function (t) {
+      if (t.id === recurrenceId && t.recurrence) {
+        var newUntil = (t.recurrenceUntil && t.recurrenceUntil < dayBefore) ? t.recurrenceUntil : dayBefore;
+        return Object.assign({}, t, { recurrenceUntil: newUntil });
+      }
+      return t;
+    });
+    saveTasks(updated);
+    render();
   }
 
   function escapeHtml(str) {
@@ -743,7 +1421,7 @@
   }
 
   /* ============================== Task modal ============================== */
-  var modalState = { editingId: null, dayKey: null, priority: "standard", category: "other", recurrence: "none", subtasks: [] };
+  var modalState = { editingId: null, dayKey: null, priority: "standard", category: "other", recurrence: "none", recurrenceUntil: "", subtasks: [] };
 
   function openTaskModal(taskId, dayKeyForNew) {
     var backdrop = document.getElementById("taskModalBackdrop");
@@ -758,19 +1436,32 @@
         priority: task.priority,
         category: task.category,
         recurrence: task.recurrence || "none",
+        recurrenceUntil: task.recurrenceUntil || "",
         subtasks: task.subtasks ? task.subtasks.map(function (s) { return Object.assign({}, s); }) : [],
       };
-      document.getElementById("taskModalTitle").textContent = "Edytuj zadanie";
+      document.getElementById("taskModalTitle").textContent = "Edit Task";
       document.getElementById("taskTitleInput").value = task.title;
+      document.getElementById("taskDescInput").value = task.description || "";
       deleteBtn.style.display = "block";
     } else {
-      modalState = { editingId: null, dayKey: dayKeyForNew, priority: "standard", category: "other", recurrence: "none", subtasks: [] };
-      document.getElementById("taskModalTitle").textContent = "Nowe zadanie";
+      modalState = { editingId: null, dayKey: dayKeyForNew, priority: "standard", category: "other", recurrence: "none", recurrenceUntil: "", subtasks: [] };
+      document.getElementById("taskModalTitle").textContent = "New Task";
       document.getElementById("taskTitleInput").value = "";
+      document.getElementById("taskDescInput").value = "";
       deleteBtn.style.display = "none";
     }
-    document.getElementById("taskModalDay").textContent = formatDayNameLong(modalState.dayKey);
+    var dayBtn = document.getElementById("taskModalDay");
+    if (taskId) {
+      dayBtn.innerHTML = escapeHtml(formatDayNameLong(modalState.dayKey)) + ' <span style="opacity:.7;">▾</span>';
+      dayBtn.style.cursor = "pointer";
+      dayBtn.onclick = function () { openDayPicker("moveDay", computeFormRecurrenceInfo()); };
+    } else {
+      dayBtn.textContent = formatDayNameLong(modalState.dayKey);
+      dayBtn.style.cursor = "default";
+      dayBtn.onclick = null;
+    }
     document.getElementById("subtaskInput").value = "";
+    updateRecurrenceUntilUI();
     renderPriorityRow();
     renderCategoryGrid();
     renderRecurrenceRow();
@@ -787,6 +1478,263 @@
     return names[d.getDay()] + ", " + d.getDate() + " " + MONTH_SHORT[d.getMonth()];
   }
 
+  /* ============================== Day picker (move task to another day) ============================== */
+  var dpState = { year: today.getFullYear(), month: today.getMonth() };
+  var dpTarget = "moveDay"; // "moveDay" | "recurrenceUntil" | "quickMove"
+  var dpViewMode = "day"; // "day" | "month"
+  var dpRecurrenceInfo = null; // { recurrence, startDayKey, untilDayKey } | null
+  var dpQuickMoveTaskId = null; // set when dpTarget === "quickMove"
+  var dpSuppressClick = false;
+
+  function computeFormRecurrenceInfo() {
+    if (modalState.recurrence === "none") return null;
+    return { recurrence: modalState.recurrence, startDayKey: modalState.dayKey, untilDayKey: modalState.recurrenceUntil || null };
+  }
+
+  // For the "Repeat Until" picker, only today (or the task's own start day,
+  // whichever is later) and beyond should be reachable/selectable.
+  function dpFloorDate() {
+    var todayFloor = new Date(today);
+    todayFloor.setHours(0, 0, 0, 0);
+    if (dpTarget === "recurrenceUntil") {
+      // A recurrence can't be told to end before it even starts.
+      var startFloor = dateFromDayKey(modalState.dayKey);
+      startFloor.setHours(0, 0, 0, 0);
+      return startFloor.getTime() > todayFloor.getTime() ? startFloor : todayFloor;
+    }
+    if (dpTarget === "jumpToWeek") return null; // browsing past weeks in the planner is normal
+    // "moveDay" and "quickMove": you can't move/schedule a task into the past.
+    return todayFloor;
+  }
+
+  function dpClampToFloor() {
+    var floor = dpFloorDate();
+    if (!floor) return;
+    if (dpState.year < floor.getFullYear() || (dpState.year === floor.getFullYear() && dpState.month < floor.getMonth())) {
+      dpState.year = floor.getFullYear();
+      dpState.month = floor.getMonth();
+    }
+  }
+
+  function openDayPicker(target, recurrenceInfo, quickMoveTaskId, anchorDate) {
+    dpTarget = target || "moveDay";
+    dpRecurrenceInfo = recurrenceInfo || null;
+    dpQuickMoveTaskId = quickMoveTaskId || null;
+    var baseKey;
+    if (dpTarget === "quickMove") {
+      var qt = state.tasks.find(function (t) { return t.id === quickMoveTaskId; });
+      baseKey = qt ? qt.dayKey : formatDayKey(today);
+    } else if (dpTarget === "recurrenceUntil") {
+      baseKey = modalState.recurrenceUntil || modalState.dayKey;
+    } else if (dpTarget === "jumpToWeek") {
+      baseKey = anchorDate ? formatDayKey(anchorDate) : formatDayKey(today);
+    } else {
+      baseKey = modalState.dayKey;
+    }
+    var d = dateFromDayKey(baseKey);
+    dpState.year = d.getFullYear();
+    dpState.month = d.getMonth();
+    dpClampToFloor();
+    showDpView("day");
+    renderDayPickerModal();
+    document.getElementById("dayPickerModalBackdrop").classList.remove("hidden");
+  }
+  function closeDayPicker() {
+    document.getElementById("dayPickerModalBackdrop").classList.add("hidden");
+  }
+
+  function showDpView(mode) {
+    dpViewMode = mode;
+    document.getElementById("dpDayView").style.display = mode === "day" ? "block" : "none";
+    document.getElementById("dpMonthView").style.display = mode === "month" ? "block" : "none";
+  }
+
+  function isMonthEntirelyBeforeFloor(year, monthIndex, floor) {
+    if (!floor) return false;
+    var lastDayOfThatMonth = new Date(year, monthIndex + 1, 0);
+    lastDayOfThatMonth.setHours(0, 0, 0, 0);
+    return lastDayOfThatMonth.getTime() < floor.getTime();
+  }
+
+  // Days (within the given month) that the described recurrence pattern
+  // would land on - used to lightly highlight them in orange while the
+  // person is picking a date, so they can see the pattern at a glance.
+  function computeRecurringHighlightDays(info, year, month) {
+    var result = {};
+    if (!info || !info.recurrence || !info.startDayKey) return result;
+    var startDate = dateFromDayKey(info.startDayKey);
+    startDate.setHours(0, 0, 0, 0);
+    var untilDate = info.untilDayKey ? dateFromDayKey(info.untilDayKey) : null;
+    if (untilDate) untilDate.setHours(0, 0, 0, 0);
+    var weeks = buildMonthGrid(year, month);
+    weeks.forEach(function (week) {
+      week.forEach(function (day) {
+        if (!day) return;
+        var d = new Date(day); d.setHours(0, 0, 0, 0);
+        if (d.getTime() < startDate.getTime()) return;
+        if (untilDate && d.getTime() > untilDate.getTime()) return;
+        var matches = info.recurrence === "daily" ||
+          (info.recurrence === "weekly" && d.getDay() === startDate.getDay()) ||
+          (info.recurrence === "monthly" && isMonthlyMatch(d, startDate));
+        if (matches) result[formatDayKey(d)] = true;
+      });
+    });
+    return result;
+  }
+
+  function renderMonthGridView() {
+    var floor = dpFloorDate();
+    document.getElementById("dpMonthViewYearLabel").textContent = String(dpState.year);
+
+    var prevYearBtn = document.getElementById("dpMonthViewPrevYear");
+    var disablePrevYear = !!(floor && dpState.year <= floor.getFullYear());
+    prevYearBtn.disabled = disablePrevYear;
+    prevYearBtn.style.opacity = disablePrevYear ? "0.3" : "1";
+
+    var grid = document.getElementById("dpMonthGrid");
+    var html = "";
+    for (var m = 0; m < 12; m++) {
+      var disabled = isMonthEntirelyBeforeFloor(dpState.year, m, floor);
+      var isThisMonth = dpState.year === today.getFullYear() && m === today.getMonth();
+      html += '<button class="month-grid-cell' + (disabled ? " disabled" : "") + (isThisMonth ? " current" : "") + '"' +
+        (disabled ? " disabled" : ' data-month="' + m + '"') + '>' + MONTH_SHORT[m] + '</button>';
+    }
+    grid.innerHTML = html;
+    grid.querySelectorAll("[data-month]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        dpState.month = parseInt(btn.getAttribute("data-month"), 10);
+        showDpView("day");
+        renderDayPickerModal();
+      });
+    });
+  }
+
+  function renderDayPickerModal() {
+    var monthLabelEl = document.getElementById("dpMonthLabel");
+    monthLabelEl.innerHTML = escapeHtml(MONTH_NAMES[dpState.month] + " " + dpState.year) + ' <span class="month-label-chevron">▾</span>';
+    var wdRow = document.getElementById("dpWeekdayRow");
+    wdRow.innerHTML = DAY_LABELS.map(function (l, i) {
+      return '<span class="weekday-cell' + (i >= 5 ? " weekend" : "") + '">' + l[0] + '</span>';
+    }).join("");
+
+    var floor = dpFloorDate();
+    var atFloorMonth = floor && dpState.year === floor.getFullYear() && dpState.month === floor.getMonth();
+    var prevMonthBtn = document.getElementById("dpPrevMonth");
+    prevMonthBtn.disabled = !!atFloorMonth;
+    prevMonthBtn.style.opacity = atFloorMonth ? "0.3" : "1";
+
+    var relevantSelected = dpTarget === "recurrenceUntil" ? modalState.recurrenceUntil
+      : (dpTarget === "quickMove" || dpTarget === "jumpToWeek") ? null
+      : modalState.dayKey;
+    var currentWeekKeys = dpTarget === "jumpToWeek" ? currentWeekDays().map(formatDayKey) : null;
+    var previewDays = computeRecurringHighlightDays(dpRecurrenceInfo, dpState.year, dpState.month);
+    var weeks = buildMonthGrid(dpState.year, dpState.month);
+    var html = "";
+    weeks.forEach(function (week) {
+      var rowIsCurrentWeek = false;
+      if (currentWeekKeys) {
+        for (var wi = 0; wi < week.length; wi++) {
+          if (week[wi] && currentWeekKeys.indexOf(formatDayKey(week[wi])) !== -1) { rowIsCurrentWeek = true; break; }
+        }
+      }
+      html += '<div class="week-row' + (rowIsCurrentWeek ? " current-week" : "") + '">';
+      week.forEach(function (day) {
+        if (!day) { html += '<div class="cal-day-cell"></div>'; return; }
+        var dKey = formatDayKey(day);
+        var isToday = isSameDay(day, today);
+        var isSelected = dKey === relevantSelected;
+        var otherMonth = day.getMonth() !== dpState.month;
+        var isDisabled = !!(floor && day.getTime() < floor.getTime());
+        var isPreview = !!previewDays[dKey];
+        html += '<div class="cal-day-cell"' + (isDisabled ? "" : ' data-pickday="' + dKey + '"') + '>' +
+          '<div class="cal-day-inner' + (isToday ? " today" : "") + (isSelected ? " selected" : "") + (otherMonth ? " other-month" : "") + (isDisabled ? " disabled" : "") + (isPreview ? " preview" : "") + '">' +
+          day.getDate() + '</div></div>';
+      });
+      html += '</div>';
+    });
+    var weeksEl = document.getElementById("dpWeeks");
+    weeksEl.innerHTML = html;
+    weeksEl.querySelectorAll("[data-pickday]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        if (dpSuppressClick) return;
+        var picked = el.getAttribute("data-pickday");
+        if (dpTarget === "recurrenceUntil") {
+          modalState.recurrenceUntil = picked;
+          updateRecurrenceUntilUI();
+        } else if (dpTarget === "quickMove") {
+          closeDayPicker();
+          moveTaskToDay(dpQuickMoveTaskId, picked);
+          return;
+        } else if (dpTarget === "jumpToWeek") {
+          var targetMonday = getWeekMonday(dateFromDayKey(picked));
+          var todayMonday = getWeekMonday(new Date(today));
+          state.weekOffset = Math.round((targetMonday.getTime() - todayMonday.getTime()) / (7 * 86400000));
+          closeDayPicker();
+          render();
+          return;
+        } else {
+          modalState.dayKey = picked;
+          var dayBtn = document.getElementById("taskModalDay");
+          dayBtn.innerHTML = escapeHtml(formatDayNameLong(modalState.dayKey)) + ' <span style="opacity:.7;">▾</span>';
+        }
+        closeDayPicker();
+      });
+    });
+  }
+
+  function dpGoToMonth(delta) {
+    dpState.month += delta;
+    if (dpState.month < 0) { dpState.month = 11; dpState.year--; }
+    else if (dpState.month > 11) { dpState.month = 0; dpState.year++; }
+  }
+
+  function animateDpMonthChange(delta) {
+    if (delta < 0 && document.getElementById("dpPrevMonth").disabled) return;
+    var weeksEl = document.getElementById("dpWeeks");
+    var outX = delta > 0 ? "-22px" : "22px";
+    var inX = delta > 0 ? "22px" : "-22px";
+    weeksEl.style.transition = "transform .14s ease, opacity .14s ease";
+    weeksEl.style.transform = "translateX(" + outX + ")";
+    weeksEl.style.opacity = "0";
+    setTimeout(function () {
+      dpGoToMonth(delta);
+      dpClampToFloor();
+      renderDayPickerModal();
+      var freshWeeksEl = document.getElementById("dpWeeks");
+      freshWeeksEl.style.transition = "none";
+      freshWeeksEl.style.transform = "translateX(" + inX + ")";
+      freshWeeksEl.style.opacity = "0";
+      void freshWeeksEl.offsetWidth; // force reflow so the next transition actually animates
+      freshWeeksEl.style.transition = "transform .14s ease, opacity .14s ease";
+      freshWeeksEl.style.transform = "translateX(0)";
+      freshWeeksEl.style.opacity = "1";
+    }, 140);
+  }
+
+  function attachDpSwipe(weeksEl) {
+    var startX = 0, startY = 0, tracking = false, moved = false;
+    weeksEl.addEventListener("pointerdown", function (e) {
+      startX = e.clientX; startY = e.clientY; tracking = true; moved = false;
+    });
+    weeksEl.addEventListener("pointermove", function (e) {
+      if (!tracking) return;
+      var dx = e.clientX - startX, dy = e.clientY - startY;
+      if (!moved && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) moved = true;
+    });
+    function endSwipe(e) {
+      if (!tracking) return;
+      tracking = false;
+      if (!moved) return;
+      var dx = e.clientX - startX;
+      if (Math.abs(dx) < 40) return;
+      dpSuppressClick = true;
+      setTimeout(function () { dpSuppressClick = false; }, 300);
+      animateDpMonthChange(dx < 0 ? 1 : -1);
+    }
+    weeksEl.addEventListener("pointerup", endSwipe);
+    weeksEl.addEventListener("pointercancel", function () { tracking = false; });
+  }
+
   function renderPriorityRow() {
     document.querySelectorAll("#priorityRow .option-pill").forEach(function (btn) {
       btn.classList.toggle("active", btn.getAttribute("data-priority") === modalState.priority);
@@ -796,6 +1744,20 @@
     document.querySelectorAll("#recurrenceRow .option-pill").forEach(function (btn) {
       btn.classList.toggle("active", btn.getAttribute("data-recurrence") === modalState.recurrence);
     });
+    updateRecurrenceUntilUI();
+  }
+  function updateRecurrenceUntilUI() {
+    var wrap = document.getElementById("recurrenceUntilWrap");
+    wrap.style.display = modalState.recurrence === "none" ? "none" : "block";
+    var label = document.getElementById("recurrenceUntilLabel");
+    var clearBtn = document.getElementById("recurrenceUntilClear");
+    if (modalState.recurrenceUntil) {
+      label.textContent = formatDayNameLong(modalState.recurrenceUntil);
+      clearBtn.style.display = "flex";
+    } else {
+      label.textContent = "No end date";
+      clearBtn.style.display = "none";
+    }
   }
   function renderCategoryGrid() {
     var grid = document.getElementById("categoryGrid");
@@ -828,8 +1790,20 @@
     wrap.querySelectorAll("[data-subremove]").forEach(function (el) {
       el.addEventListener("click", function () {
         var id = el.getAttribute("data-subremove");
-        modalState.subtasks = modalState.subtasks.filter(function (s) { return s.id !== id; });
-        renderSubtaskList();
+        var item = modalState.subtasks.find(function (s) { return s.id === id; });
+        showConfirm({
+          title: "Delete checklist item?",
+          message: item ? item.title : undefined,
+          buttons: [
+            { label: "Cancel", variant: "neutral", isCancel: true },
+            {
+              label: "Delete", variant: "danger", onPress: function () {
+                modalState.subtasks = modalState.subtasks.filter(function (s) { return s.id !== id; });
+                renderSubtaskList();
+              }
+            },
+          ],
+        });
       });
     });
   }
@@ -849,18 +1823,31 @@
   function saveTaskModal() {
     var title = document.getElementById("taskTitleInput").value.trim();
     if (!title) return;
+    var description = document.getElementById("taskDescInput").value.trim() || undefined;
 
     if (modalState.editingId) {
+      var originalTask = state.tasks.find(function (t) { return t.id === modalState.editingId; });
+      var dayChanged = originalTask && modalState.dayKey !== originalTask.dayKey;
+      var newOrder = originalTask ? originalTask.order : 0;
+      if (dayChanged) {
+        newOrder = state.tasks
+          .filter(function (t) { return t.dayKey === modalState.dayKey && t.id !== modalState.editingId; })
+          .reduce(function (m, t) { return Math.max(m, t.order); }, -1) + 1;
+      }
       var updated = state.tasks.map(function (t) {
         if (t.id !== modalState.editingId) return t;
         var recurrence = modalState.recurrence === "none" ? undefined : modalState.recurrence;
         return Object.assign({}, t, {
           title: title,
+          dayKey: modalState.dayKey,
+          order: newOrder,
           priority: modalState.priority,
           category: modalState.category,
           subtasks: modalState.subtasks.length ? modalState.subtasks : undefined,
           recurrence: recurrence,
           recurrenceId: recurrence ? (t.recurrenceId || t.id) : t.recurrenceId,
+          recurrenceUntil: recurrence ? (modalState.recurrenceUntil || undefined) : undefined,
+          description: description,
         });
       });
       saveTasks(updated);
@@ -881,6 +1868,8 @@
         subtasks: modalState.subtasks.length ? modalState.subtasks : undefined,
         recurrence: recurrence,
         recurrenceId: recurrence ? id : undefined,
+        recurrenceUntil: recurrence ? (modalState.recurrenceUntil || undefined) : undefined,
+        description: description,
       };
       saveTasks(state.tasks.concat([newTask]));
     }
@@ -890,14 +1879,12 @@
 
   function deleteTaskFromModal() {
     if (!modalState.editingId) return;
-    saveTasks(state.tasks.filter(function (t) { return t.id !== modalState.editingId; }));
-    closeTaskModal();
-    render();
+    requestDeleteConfirm(modalState.editingId, null, function () {
+      closeTaskModal();
+    });
   }
 
   /* ============================== Month calendar modal ============================== */
-  var calState = { year: today.getFullYear(), month: today.getMonth() };
-
   function buildMonthGrid(year, month) {
     var firstDay = new Date(year, month, 1);
     var lastDay = new Date(year, month + 1, 0);
@@ -909,57 +1896,17 @@
     while (days.length % 7 !== 0) days.push(null);
     var weeks = [];
     for (var j = 0; j < days.length; j += 7) weeks.push(days.slice(j, j + 7));
+    // Always return exactly 6 week-rows so calendar modals never change
+    // height when switching between 4/5/6-row months.
+    while (weeks.length < 6) weeks.push([null, null, null, null, null, null, null]);
     return weeks;
   }
 
-  function openCalendarModal() {
-    var weekDays = currentWeekDays();
-    calState.year = weekDays[0].getFullYear();
-    calState.month = weekDays[0].getMonth();
-    renderCalendarModal();
-    document.getElementById("calendarModalBackdrop").classList.remove("hidden");
-  }
-  function closeCalendarModal() { document.getElementById("calendarModalBackdrop").classList.add("hidden"); }
-
-  function renderCalendarModal() {
-    document.getElementById("calMonthLabel").textContent = MONTH_NAMES[calState.month] + " " + calState.year;
-    var wdRow = document.getElementById("calWeekdayRow");
-    wdRow.innerHTML = DAY_LABELS.map(function (l, i) {
-      return '<span class="weekday-cell' + (i >= 5 ? " weekend" : "") + '">' + l[0] + '</span>';
-    }).join("");
-
-    var weeks = buildMonthGrid(calState.year, calState.month);
-    var currentMonday = currentWeekDays()[0];
-    var currentMondayKey = formatDayKey(currentMonday);
-
-    var html = "";
-    weeks.forEach(function (week) {
-      var mondayOfWeek = null;
-      for (var i = 0; i < week.length; i++) { if (week[i]) { mondayOfWeek = getWeekMonday(week[i]); break; } }
-      var selected = mondayOfWeek && formatDayKey(mondayOfWeek) === currentMondayKey;
-      html += '<div class="week-row' + (selected ? " selected" : "") + '" data-week="' + (mondayOfWeek ? formatDayKey(mondayOfWeek) : "") + '">';
-      week.forEach(function (day) {
-        if (!day) { html += '<div class="cal-day-cell"></div>'; return; }
-        var isToday = isSameDay(day, today);
-        var otherMonth = day.getMonth() !== calState.month;
-        html += '<div class="cal-day-cell"><div class="cal-day-inner' + (isToday ? " today" : "") + (otherMonth ? " other-month" : "") + '">' + day.getDate() + '</div></div>';
-      });
-      html += '</div>';
-    });
-    var weeksEl = document.getElementById("calWeeks");
-    weeksEl.innerHTML = html;
-    weeksEl.querySelectorAll("[data-week]").forEach(function (el) {
-      el.addEventListener("click", function () {
-        var mondayKey = el.getAttribute("data-week");
-        if (!mondayKey) return;
-        var targetMonday = getWeekMonday(dateFromDayKey(mondayKey));
-        var todayMonday = getWeekMonday(new Date(today));
-        var diffWeeks = Math.round((targetMonday.getTime() - todayMonday.getTime()) / (7 * 86400000));
-        state.weekOffset = diffWeeks;
-        closeCalendarModal();
-        render();
-      });
-    });
+  // Opens the shared day-picker in "jump to week" mode: picking any day
+  // (past or future - no floor restriction here) navigates the planner to
+  // the week containing it.
+  function openJumpToWeekPicker() {
+    openDayPicker("jumpToWeek", null, null, currentWeekDays()[0]);
   }
 
   /* ============================== Stats modal ============================== */
@@ -1062,7 +2009,8 @@
     loadData();
     document.getElementById("notesInput").value = state.notes;
 
-    document.getElementById("openCalendarBtn").addEventListener("click", openCalendarModal);
+    document.getElementById("openCalendarBtn").addEventListener("click", openJumpToWeekPicker);
+    document.getElementById("headerCenterBtn").addEventListener("click", openJumpToWeekPicker);
     document.getElementById("statsBtn").addEventListener("click", openStatsModal);
     document.getElementById("shareBtn").addEventListener("click", shareWeek);
     document.getElementById("sortBtn").addEventListener("click", function () {
@@ -1097,30 +2045,51 @@
     document.querySelectorAll("#recurrenceRow .option-pill").forEach(function (btn) {
       btn.addEventListener("click", function () { modalState.recurrence = btn.getAttribute("data-recurrence"); renderRecurrenceRow(); });
     });
+    document.getElementById("recurrenceUntilBtn").addEventListener("click", function () { openDayPicker("recurrenceUntil", computeFormRecurrenceInfo()); });
+    document.getElementById("recurrenceUntilClear").addEventListener("click", function () {
+      modalState.recurrenceUntil = "";
+      updateRecurrenceUntilUI();
+    });
     document.getElementById("subtaskAddBtn").addEventListener("click", addSubtaskFromInput);
     document.getElementById("subtaskInput").addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); addSubtaskFromInput(); }
     });
 
-    // Calendar modal wiring
-    document.getElementById("calPrevMonth").addEventListener("click", function () {
-      calState.month--; if (calState.month < 0) { calState.month = 11; calState.year--; }
-      renderCalendarModal();
+    // Day picker modal wiring (move-task-to-day, inside the task edit sheet)
+    document.getElementById("dpPrevMonth").addEventListener("click", function () {
+      dpState.month--; if (dpState.month < 0) { dpState.month = 11; dpState.year--; }
+      dpClampToFloor();
+      renderDayPickerModal();
     });
-    document.getElementById("calNextMonth").addEventListener("click", function () {
-      calState.month++; if (calState.month > 11) { calState.month = 0; calState.year++; }
-      renderCalendarModal();
+    document.getElementById("dpNextMonth").addEventListener("click", function () {
+      dpState.month++; if (dpState.month > 11) { dpState.month = 0; dpState.year++; }
+      renderDayPickerModal();
     });
-    document.getElementById("calendarModalClose").addEventListener("click", closeCalendarModal);
-    document.getElementById("calendarModalBackdrop").addEventListener("click", function (e) { if (e.target === this) closeCalendarModal(); });
+    attachDpSwipe(document.getElementById("dpWeeks"));
+    document.getElementById("dpMonthLabel").addEventListener("click", function () {
+      showDpView("month");
+      renderMonthGridView();
+    });
+    document.getElementById("dpMonthViewPrevYear").addEventListener("click", function () {
+      dpState.year--;
+      renderMonthGridView();
+    });
+    document.getElementById("dpMonthViewNextYear").addEventListener("click", function () {
+      dpState.year++;
+      renderMonthGridView();
+    });
+    document.getElementById("dayPickerModalClose").addEventListener("click", closeDayPicker);
+    document.getElementById("dayPickerModalBackdrop").addEventListener("click", function (e) { if (e.target === this) closeDayPicker(); });
 
     // Stats modal wiring
     document.getElementById("statsModalClose").addEventListener("click", closeStatsModal);
     document.getElementById("statsModalBackdrop").addEventListener("click", function (e) { if (e.target === this) closeStatsModal(); });
 
+    document.getElementById("confirmModalBackdrop").addEventListener("click", function (e) { if (e.target === this) cancelConfirm(); });
+
     document.addEventListener("keydown", function (e) {
       if (e.key !== "Escape") return;
-      closeTaskModal(); closeCalendarModal(); closeStatsModal();
+      closeTaskModal(); closeDayPicker(); closeStatsModal(); cancelConfirm();
     });
 
     render();
