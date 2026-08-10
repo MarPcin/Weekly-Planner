@@ -38,6 +38,7 @@
     -webkit-font-smoothing: antialiased;
   }
   button, input, textarea { font-family: inherit; color: inherit; }
+  .hidden { display: none !important; }
   button { transition: transform .1s ease, opacity .1s ease; }
   button:active { transform: scale(0.94); opacity: 0.8; }
   button { cursor: pointer; background: none; border: none; }
@@ -46,6 +47,7 @@
     flex-direction: column;
     height: 100vh;
     height: 100dvh; /* real iOS viewport height, excludes Safari's collapsing toolbar/keyboard area */
+    height: calc(var(--app-height, 100dvh)); /* JS-measured fallback, covers iOS quirks where dvh under-reports */
     max-width: 640px;
     margin: 0 auto;
     background: var(--bg);
@@ -79,18 +81,28 @@
   .icon-btn:hover { background: var(--surface-elevated); }
   .icon-btn.active { background: var(--accent-soft); color: var(--accent); }
   .menu-btn {
-    width: auto; flex-direction: column; gap: 0; padding: 3px 6px;
+    width: auto; flex-direction: column; gap: 3px; padding: 3px 6px;
     font-size: 15px; line-height: 1.1;
   }
+  .menu-avatar {
+    width: 22px; height: 22px; border-radius: 11px; overflow: hidden;
+    background: var(--surface-elevated); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+  }
+  .menu-avatar img { width: 100%; height: 100%; object-fit: cover; }
   .menu-btn-label { font-size: 8px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; }
-  .header-center {
+  .header-center-group {
     position: absolute; left: 50%; top: 50%;
     transform: translate(-50%, -50%);
     margin-top: calc(env(safe-area-inset-top) / 2);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .header-center {
+    width: 120px; max-width: 50vw;
     text-align: center; background: var(--surface-elevated);
     border: 1px solid var(--border); border-radius: 12px;
-    padding: 5px 14px; cursor: pointer;
-    max-width: 55%;
+    padding: 5px 4px; cursor: pointer;
+    overflow: hidden;
   }
   .header-center:hover { border-color: var(--accent); }
   .header-title {
@@ -98,7 +110,7 @@
     background: linear-gradient(120deg, var(--accent), #9b9dfb);
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
-  .header-week { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+  .header-week { font-size: 10px; color: var(--text-secondary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .header-right { display: flex; align-items: center; gap: 2px; flex-shrink: 0; margin-left: auto; z-index: 1; }
   .today-btn {
     padding: 6px 12px; border-radius: 16px;
@@ -115,25 +127,33 @@
     flex-shrink: 0;
     background: var(--bg);
   }
-  .filter-scroll {
-    flex: 1; min-width: 0;
-    display: flex; gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .filter-scroll::-webkit-scrollbar { display: none; }
-  .filter-chip {
-    display: flex; align-items: center; gap: 4px;
-    padding: 6px 11px;
-    border-radius: 14px;
+  .filter-summary-btn {
+    flex: 0 0 auto; width: 100px; text-align: center; overflow: hidden;
+    white-space: nowrap; text-overflow: ellipsis;
+    padding: 7px 4px;
+    border-radius: 10px;
     background: var(--surface-elevated);
     border: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: 11px; font-weight: 700;
-    white-space: nowrap; flex-shrink: 0;
+    color: var(--text-secondary);
+    font-size: 12px; font-weight: 700;
   }
-  .filter-chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-  .toolbar-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .filter-summary-btn.has-selection { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-size: 15px; }
+  .category-filter-row {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 10px 6px; border-radius: 10px; text-align: left;
+    background: none; border: none; color: var(--text);
+  }
+  .category-filter-row:hover { background: var(--surface-elevated); }
+  .category-filter-row.active { background: var(--accent-soft); }
+  .cf-emoji { font-size: 16px; width: 22px; text-align: center; flex-shrink: 0; }
+  .cf-label { flex: 1; font-size: 14px; font-weight: 600; }
+  .cf-check {
+    width: 20px; height: 20px; border-radius: 10px; border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center; font-size: 11px;
+    color: var(--accent); flex-shrink: 0;
+  }
+  .cf-check.done { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .toolbar-actions { display: flex; gap: 2px; flex-shrink: 0; margin-left: auto; }
 
   /* ---------- Day list ---------- */
   .day-list { flex: 1; overflow-y: auto; padding-bottom: 8px; }
@@ -251,7 +271,7 @@
     width: 22px; height: 22px; border-radius: 11px;
     border: 1.5px solid var(--border);
     display: flex; align-items: center; justify-content: center;
-    margin-left: 10px; margin-right: 2px; flex-shrink: 0;
+    margin-left: 16px; margin-right: 8px; flex-shrink: 0;
     font-size: 12px; font-weight: 700; color: #fff;
   }
   .select-check.done { border-color: var(--accent); background: var(--accent); }
@@ -321,10 +341,25 @@
   }
   .profile-avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
   .profile-name-input {
-    flex: 1; background: var(--surface-elevated); border: 1.5px solid var(--border);
+    flex: 1; min-width: 0; background: var(--surface-elevated); border: 1.5px solid var(--border);
     border-radius: 10px; padding: 10px 12px; font-size: 15px; color: var(--text); outline: none;
   }
   .profile-name-input:focus { border-color: var(--accent); }
+  .avatar-choice-btn {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 14px 12px; margin-bottom: 8px; border-radius: 12px;
+    background: var(--surface-elevated); border: 1px solid var(--border);
+    color: var(--text); font-size: 14px; font-weight: 600; text-align: left;
+  }
+  .avatar-choice-btn:hover { border-color: var(--accent); }
+  .avatar-choice-emoji { font-size: 22px; flex-shrink: 0; }
+  .avatar-preset-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .avatar-preset-btn {
+    width: 40px; height: 40px; border-radius: 20px; font-size: 20px;
+    background: var(--surface-elevated); border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .avatar-preset-btn.active { border-color: var(--accent); background: var(--accent-soft); }
   .theme-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
   .theme-swatch {
     width: 34px; height: 34px; border-radius: 17px; border: 2.5px solid transparent;
@@ -420,12 +455,20 @@
     padding: 8px 14px calc(14px + env(safe-area-inset-bottom));
     flex-shrink: 0;
   }
-  .notes-header { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; color: var(--text-muted); }
+  .notes-header { display: flex; align-items: center; justify-content: space-between; gap: 5px; margin-bottom: 5px; color: var(--text-muted); }
+  .notes-header-left { display: flex; align-items: center; gap: 5px; }
   .notes-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.9px; }
+  .notes-delete-all-btn {
+    font-size: 10px; font-weight: 700; color: var(--danger);
+    background: var(--surface-elevated); border: 1px solid var(--border);
+    padding: 4px 9px; border-radius: 8px;
+  }
   .notes-textarea {
-    width: 100%; height: 64px; resize: none;
+    width: 100%; height: 78px; resize: none;
     background: none; border: none; outline: none;
     font-size: 16px; color: var(--text); line-height: 22px;
+    transition: height .25s ease;
+    overflow-y: hidden;
   }
   .notes-textarea::placeholder { color: var(--text-muted); }
 
@@ -573,25 +616,28 @@
 <div id="app">
   <header class="header">
     <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">
-      <span>📅</span><span class="menu-btn-label">Menu</span>
+      <span class="menu-avatar" id="menuAvatar"><span>👤</span></span>
+      <span class="menu-btn-label">Menu</span>
     </button>
-    <button class="header-center" id="headerCenterBtn" aria-label="Jump to a date">
-      <div class="header-title">Weekly</div>
-      <div class="header-week" id="weekLabel"></div>
-    </button>
-    <div class="header-right">
-      <button class="icon-btn" id="sortBtn" aria-label="Toggle sort by priority">📊</button>
-      <button class="icon-btn today-btn" id="todayBtn" style="display:none;">Today</button>
+    <div class="header-center-group" id="headerCenterGroup">
+      <button class="icon-btn today-btn" id="todayBtnLeft" style="display:none;">Today</button>
       <button class="icon-btn" id="prevWeekBtn" aria-label="Previous week">‹</button>
+      <button class="header-center" id="headerCenterBtn" aria-label="Jump to a date">
+        <div class="header-title">Weekly</div>
+        <div class="header-week" id="weekLabel"></div>
+      </button>
       <button class="icon-btn" id="nextWeekBtn" aria-label="Next week">›</button>
+      <button class="icon-btn today-btn" id="todayBtnRight" style="display:none;">Today</button>
+    </div>
+    <div class="header-right">
+      <button class="icon-btn" id="sortBtn" aria-label="Toggle sort by priority">🔝</button>
     </div>
   </header>
 
   <div class="toolbar">
-    <div class="filter-scroll" id="filterScroll"></div>
+    <button class="filter-summary-btn" id="filterSummaryBtn" aria-label="Filter by category">All</button>
     <div class="toolbar-actions">
       <button class="icon-btn" id="statsBtn" aria-label="Week summary">📈</button>
-      <button class="icon-btn" id="shareBtn" aria-label="Share week">📤</button>
       <button class="icon-btn" id="loadMoreWeekBtn" aria-label="Show next week too">📃</button>
       <button class="icon-btn" id="selectModeBtn" aria-label="Select tasks">☑️</button>
     </div>
@@ -610,7 +656,8 @@
 
   <div class="notes-container">
     <div class="notes-header">
-      <span>✏️</span><span class="notes-label">Notes</span>
+      <div class="notes-header-left"><span>✏️</span><span class="notes-label">Notes</span></div>
+      <button class="notes-delete-all-btn hidden" id="notesDeleteAllBtn">Delete all</button>
     </div>
     <textarea class="notes-textarea" id="notesInput" maxlength="500" placeholder="Quick notes, reminders, ideas…"></textarea>
   </div>
@@ -717,17 +764,34 @@
   </div>
 </div>
 
+<!-- Avatar choice modal -->
+<div class="modal-backdrop hidden" id="avatarChoiceModalBackdrop">
+  <div class="modal-card" style="max-width:320px;">
+    <h2 class="modal-title">Choose avatar</h2>
+    <div id="avatarChoiceContent"></div>
+    <button class="close-btn" id="avatarChoiceModalClose">Cancel</button>
+  </div>
+</div>
+
+<!-- Category filter modal -->
+<div class="modal-backdrop hidden" id="categoryFilterModalBackdrop">
+  <div class="modal-card" style="max-width:340px;">
+    <h2 class="modal-title">Filter by category</h2>
+    <p class="modal-subtitle" style="color:var(--text-secondary); font-weight:400; margin-bottom:14px;">Pick any number of categories.</p>
+    <div id="categoryFilterList"></div>
+    <button class="close-btn" id="categoryFilterModalClose">Done</button>
+  </div>
+</div>
+
 <!-- Bulk move modal (selection mode) -->
 <div class="modal-backdrop hidden" id="bulkMoveModalBackdrop">
   <div class="modal-card" style="max-width:340px;">
     <h2 class="modal-title">Move selected tasks</h2>
     <p class="modal-subtitle" id="bulkMoveCount" style="color:var(--text-secondary); font-weight:400; margin-bottom:14px;"></p>
     <div class="td-move-buttons" style="margin-bottom:12px;">
-      <button class="td-move-btn" data-bulk-move="nextday">Next day</button>
-      <button class="td-move-btn" data-bulk-move="prevday">The day before</button>
-      <button class="td-move-btn" data-bulk-move="sunday">Sunday</button>
-      <button class="td-move-btn" data-bulk-move="nextweek">Next week</button>
-      <button class="td-move-btn" data-bulk-move="nextweekend">Next weekend</button>
+      <button class="td-move-btn" data-bulk-move="nextday">Day</button>
+      <button class="td-move-btn" data-bulk-move="weekend">Weekend</button>
+      <button class="td-move-btn" data-bulk-move="week">Week</button>
     </div>
     <button class="td-move-cal-btn" id="bulkMoveCalBtn" style="width:100%; border-radius:10px; gap:6px;" aria-label="Pick a date">📅 Pick a date</button>
     <button class="close-btn" id="bulkMoveModalClose">Cancel</button>
@@ -761,7 +825,7 @@
     { value: "finance", emoji: "💸", label: "Finance" },
     { value: "entertainment", emoji: "🕺", label: "Fun" },
     { value: "health", emoji: "🩺", label: "Health" },
-    { value: "other", emoji: "☑️", label: "Other" },
+    { value: "other", emoji: "✔️", label: "Other" },
   ];
   var CATEGORY_MAP = {};
   CATEGORIES.forEach(function (c) { CATEGORY_MAP[c.value] = c; });
@@ -770,6 +834,8 @@
   var NOTES_KEY = "weekly_planner_notes_web_v1";
   var PROFILE_KEY = "weekly_planner_profile_v1";
   var LIFETIME_KEY = "weekly_planner_lifetime_v1";
+
+  var AVATAR_PRESETS = ["🐶", "🐱", "🦊", "🐼", "🐸", "🦁", "🐨", "🐧", "🦉", "🐢", "🦄", "🐙"];
 
   var THEMES = [
     { id: "default", name: "Indigo", accent: "#6366F1", today: "#F59E0B" },
@@ -922,6 +988,65 @@
     state.notes = text;
     try { localStorage.setItem(NOTES_KEY, text); } catch (e) {}
   }
+
+  var isNotesExpanded = false;
+  var NOTES_COLLAPSED_HEIGHT = 78;
+
+  function expandNotes() {
+    var ta = document.getElementById("notesInput");
+    var deleteBtn = document.getElementById("notesDeleteAllBtn");
+    var hasContent = ta.value && ta.value.trim().length > 0;
+    if (!hasContent) {
+      isNotesExpanded = false;
+      ta.style.height = NOTES_COLLAPSED_HEIGHT + "px";
+      ta.style.overflowY = "hidden";
+      deleteBtn.classList.add("hidden");
+      return;
+    }
+    isNotesExpanded = true;
+    deleteBtn.classList.remove("hidden");
+    var appHeightRaw = getComputedStyle(document.documentElement).getPropertyValue("--app-height");
+    var appHeight = parseFloat(appHeightRaw) || window.innerHeight;
+    var maxHeight = Math.floor(appHeight / 3);
+    var prevHeight = ta.style.height || NOTES_COLLAPSED_HEIGHT + "px";
+    ta.style.transition = "none";
+    ta.style.height = "auto";
+    var natural = ta.scrollHeight;
+    ta.style.height = prevHeight;
+    void ta.offsetHeight; // force reflow so the next height change actually animates
+    ta.style.transition = "height .25s ease";
+    var target = Math.min(Math.max(natural, NOTES_COLLAPSED_HEIGHT), maxHeight);
+    ta.style.height = target + "px";
+    ta.style.overflowY = natural > maxHeight ? "auto" : "hidden";
+  }
+
+  function collapseNotes() {
+    isNotesExpanded = false;
+    var ta = document.getElementById("notesInput");
+    ta.style.transition = "height .25s ease";
+    ta.style.height = NOTES_COLLAPSED_HEIGHT + "px";
+    ta.style.overflowY = "hidden";
+    document.getElementById("notesDeleteAllBtn").classList.add("hidden");
+  }
+
+  function requestDeleteAllNotes() {
+    showConfirm({
+      title: "Delete all notes?",
+      message: "This can't be undone.",
+      buttons: [
+        { label: "Cancel", variant: "neutral", isCancel: true },
+        {
+          label: "Delete", variant: "danger", onPress: function () {
+            var ta = document.getElementById("notesInput");
+            ta.value = "";
+            saveNotes("");
+            collapseNotes();
+          }
+        },
+      ],
+    });
+  }
+
   function migrateTask(t, idx) {
     return {
       id: t.id,
@@ -1057,30 +1182,78 @@
     var weekDays = currentWeekDays();
     var monday = weekDays[0];
     document.getElementById("weekLabel").textContent = formatWeekLabel(monday);
-    document.getElementById("todayBtn").style.display = state.weekOffset === 0 ? "none" : "flex";
+    // Today sits on whichever side points back toward the present: to the
+    // right of the right arrow when browsing a past week (press → to get
+    // back), to the left of the left arrow when browsing a future week
+    // (press ← to get back). Hidden entirely on the current week.
+    var todayLeft = document.getElementById("todayBtnLeft");
+    var todayRight = document.getElementById("todayBtnRight");
+    todayLeft.style.display = state.weekOffset > 0 ? "flex" : "none";
+    todayRight.style.display = state.weekOffset < 0 ? "flex" : "none";
     document.getElementById("sortBtn").classList.toggle("active", state.sortByPriority);
   }
 
+  function updateMenuAvatar() {
+    var el = document.getElementById("menuAvatar");
+    if (!el) return;
+    el.innerHTML = renderAvatarInner();
+  }
+
   function renderFilterChips() {
-    var wrap = document.getElementById("filterScroll");
+    var btn = document.getElementById("filterSummaryBtn");
+    var cats = state.filterCategories;
+    if (cats.length === 0) {
+      btn.textContent = "All";
+      btn.classList.remove("has-selection");
+    } else if (cats.length <= 3) {
+      var emojis = cats.map(function (v) { return (CATEGORY_MAP[v] || {}).emoji || ""; }).join(" ");
+      btn.textContent = emojis;
+      btn.classList.add("has-selection");
+    } else {
+      // 4+ selected: show the first two (in the order they were picked)
+      // plus a "+N" count for the rest, so the button never grows wide.
+      var firstTwo = cats.slice(0, 2).map(function (v) { return (CATEGORY_MAP[v] || {}).emoji || ""; }).join(" ");
+      btn.textContent = firstTwo + " +" + (cats.length - 2);
+      btn.classList.add("has-selection");
+    }
+  }
+
+  function openCategoryFilterModal() {
+    renderCategoryFilterList();
+    document.getElementById("categoryFilterModalBackdrop").classList.remove("hidden");
+  }
+  function closeCategoryFilterModal() {
+    document.getElementById("categoryFilterModalBackdrop").classList.add("hidden");
+  }
+  function renderCategoryFilterList() {
+    var list = document.getElementById("categoryFilterList");
     var allActive = state.filterCategories.length === 0;
-    var html = '<button class="filter-chip' + (allActive ? " active" : "") + '" data-filter="">All</button>';
+    var html = '<button class="category-filter-row' + (allActive ? " active" : "") + '" data-filter-all>' +
+      '<span class="cf-emoji">🗂️</span><span class="cf-label">All categories</span>' +
+      '<span class="cf-check' + (allActive ? " done" : "") + '">' + (allActive ? "✓" : "") + "</span></button>";
     CATEGORIES.forEach(function (c) {
       var active = state.filterCategories.indexOf(c.value) !== -1;
-      html += '<button class="filter-chip' + (active ? " active" : "") + '" data-filter="' + c.value + '">' + c.emoji + ' ' + c.label + '</button>';
+      html += '<button class="category-filter-row' + (active ? " active" : "") + '" data-filter-cat="' + c.value + '">' +
+        '<span class="cf-emoji">' + c.emoji + '</span><span class="cf-label">' + c.label + '</span>' +
+        '<span class="cf-check' + (active ? " done" : "") + '">' + (active ? "✓" : "") + "</span></button>";
     });
-    wrap.innerHTML = html;
-    wrap.querySelectorAll(".filter-chip").forEach(function (btn) {
+    list.innerHTML = html;
+    var allBtn = list.querySelector("[data-filter-all]");
+    allBtn.addEventListener("click", function () {
+      state.filterCategories = [];
+      renderCategoryFilterList();
+      renderFilterChips();
+      renderDayList();
+    });
+    list.querySelectorAll("[data-filter-cat]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var val = btn.getAttribute("data-filter");
-        if (!val) {
-          state.filterCategories = [];
-        } else {
-          var idx = state.filterCategories.indexOf(val);
-          if (idx !== -1) state.filterCategories.splice(idx, 1);
-          else state.filterCategories.push(val);
-        }
-        render();
+        var val = btn.getAttribute("data-filter-cat");
+        var idx = state.filterCategories.indexOf(val);
+        if (idx !== -1) state.filterCategories.splice(idx, 1);
+        else state.filterCategories.push(val);
+        renderCategoryFilterList();
+        renderFilterChips();
+        renderDayList();
       });
     });
   }
@@ -1355,8 +1528,8 @@
     if (!t) return "";
     var html = '<div class="task-details-inner">';
 
-    html += '<p class="td-section-label">Checklist</p>';
     if (t.subtasks && t.subtasks.length) {
+      html += '<p class="td-section-label">Checklist</p>';
       t.subtasks.forEach(function (s) {
         html += '<div class="td-subtask-outer">';
         html += '<div class="td-swipe-panel edit" data-td-sub-edit="' + s.id + '">✏️</div>';
@@ -1366,8 +1539,6 @@
         html += '<span class="td-subtask-text' + (s.completed ? " done" : "") + '" data-td-sub-label="' + s.id + '">' + escapeHtml(s.title) + '</span>';
         html += '</div></div>';
       });
-    } else {
-      html += '<p class="td-empty">No checklist items.</p>';
     }
 
     if (t.description) {
@@ -1375,17 +1546,12 @@
       html += '<p class="td-description">' + escapeHtml(t.description) + '</p>';
     }
 
-    html += '<p class="td-section-label">Move to</p>';
+    html += '<p class="td-section-label">Move to next</p>';
     html += '<div class="td-move-row">';
     html += '<div class="td-move-buttons">';
-    html += '<button class="td-move-btn" data-td-move="nextday">Next day</button>';
-    var todayKey = formatDayKey(today);
-    if (t.dayKey > todayKey) {
-      html += '<button class="td-move-btn" data-td-move="prevday">The day before</button>';
-    }
-    html += '<button class="td-move-btn" data-td-move="sunday">Sunday</button>';
-    html += '<button class="td-move-btn" data-td-move="nextweek">Next week</button>';
-    html += '<button class="td-move-btn" data-td-move="nextweekend">Next weekend</button>';
+    html += '<button class="td-move-btn" data-td-move="nextday">Day</button>';
+    html += '<button class="td-move-btn" data-td-move="weekend">Weekend</button>';
+    html += '<button class="td-move-btn" data-td-move="week">Week</button>';
     html += '</div>';
     html += '<button class="td-move-cal-btn" data-td-move-cal="1" aria-label="Pick a date">📅</button>';
     html += '</div>';
@@ -1571,16 +1737,10 @@
     var target;
     if (action === "nextday") {
       target = new Date(base); target.setDate(target.getDate() + 1);
-    } else if (action === "prevday") {
-      target = new Date(base); target.setDate(target.getDate() - 1);
-    } else if (action === "sunday") {
-      target = nextWeekdayAfter(base, 0);
-    } else if (action === "nextweek") {
-      target = nextWeekdayAfter(base, 1);
-    } else if (action === "nextweekend") {
-      var firstSat = nextWeekdayAfter(base, 6);
-      target = new Date(firstSat);
-      target.setDate(target.getDate() + 7);
+    } else if (action === "weekend") {
+      target = nextWeekdayAfter(base, 6); // nearest Saturday
+    } else if (action === "week") {
+      target = nextWeekdayAfter(base, 1); // next Monday
     } else {
       return;
     }
@@ -1642,8 +1802,14 @@
     if (btn) btn.addEventListener("click", function () { drawerView = "menu"; renderDrawerContent(); });
   }
 
+  function renderAvatarInner() {
+    if (!profile.avatar) return "<span>👤</span>";
+    if (profile.avatar.indexOf("data:") === 0) return '<img src="' + profile.avatar + '" />';
+    return "<span>" + profile.avatar + "</span>";
+  }
+
   function renderDrawerMenuList() {
-    var avatarHtml = profile.avatar ? '<img src="' + profile.avatar + '" />' : "<span>👤</span>";
+    var avatarHtml = renderAvatarInner();
     var sub = profile.name ? profile.name : "Set up your profile";
     var html = '<div class="drawer-menu-list">';
     html += '<button class="drawer-menu-row" data-drawer-nav="profile"><span class="drawer-avatar-mini">' + avatarHtml + '</span>' +
@@ -1655,6 +1821,8 @@
     html += '<button class="drawer-menu-row" data-drawer-nav="stats"><span class="drawer-menu-icon">📊</span>' +
       '<div class="drawer-menu-row-text"><div class="drawer-menu-row-title">Stats</div></div>' +
       '<span class="drawer-chevron">›</span></button>';
+    html += '<button class="drawer-menu-row" data-drawer-action="export"><span class="drawer-menu-icon">📤</span>' +
+      '<div class="drawer-menu-row-text"><div class="drawer-menu-row-title">Export week</div></div></button>';
     html += "</div>";
     return html;
   }
@@ -1665,20 +1833,32 @@
         renderDrawerContent();
       });
     });
+    var exportBtn = document.querySelector('[data-drawer-action="export"]');
+    if (exportBtn) {
+      exportBtn.addEventListener("click", function () {
+        shareWeek();
+        closeDrawer();
+      });
+    }
   }
 
   function resizeImageDataUrl(dataUrl, maxSize, callback) {
     var img = new Image();
     img.onload = function () {
-      var scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-      var w = Math.max(1, Math.round(img.width * scale));
-      var h = Math.max(1, Math.round(img.height * scale));
+      // Center-crop to the largest possible square first, then scale that
+      // square down - this bakes in a properly centered, non-distorted
+      // crop so every place the avatar is shown (any size) looks right,
+      // instead of relying on object-fit to crop a non-square source.
+      var side = Math.min(img.width, img.height);
+      var sx = (img.width - side) / 2;
+      var sy = (img.height - side) / 2;
+      var outSize = Math.min(maxSize, side);
       var canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
+      canvas.width = outSize; canvas.height = outSize;
       var ctx = canvas.getContext("2d");
       if (!ctx) { callback(dataUrl); return; }
-      ctx.drawImage(img, 0, 0, w, h);
-      try { callback(canvas.toDataURL("image/jpeg", 0.82)); }
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, outSize, outSize);
+      try { callback(canvas.toDataURL("image/jpeg", 0.85)); }
       catch (e) { callback(dataUrl); }
     };
     img.onerror = function () { callback(null); };
@@ -1691,7 +1871,7 @@
     html += '<div class="drawer-body">';
 
     html += '<div class="profile-avatar-row">';
-    html += '<button class="profile-avatar-btn" id="avatarBtn" aria-label="Change photo">' + (profile.avatar ? '<img src="' + profile.avatar + '" />' : "<span>👤</span>") + '</button>';
+    html += '<button class="profile-avatar-btn" id="avatarBtn" aria-label="Change avatar">' + renderAvatarInner() + '</button>';
     html += '<input type="text" class="profile-name-input" id="profileNameInput" placeholder="Your name" maxlength="30" value="' + escapeHtml(profile.name) + '" />';
     html += '</div>';
     html += '<input type="file" accept="image/*" id="avatarFileInput" style="display:none" />';
@@ -1715,9 +1895,7 @@
     return html;
   }
   function wireProfileView() {
-    document.getElementById("avatarBtn").addEventListener("click", function () {
-      document.getElementById("avatarFileInput").click();
-    });
+    document.getElementById("avatarBtn").addEventListener("click", openAvatarChoiceModal);
     document.getElementById("avatarFileInput").addEventListener("change", function (e) {
       var file = e.target.files && e.target.files[0];
       if (!file) return;
@@ -1727,6 +1905,7 @@
           if (!resized) return;
           profile.avatar = resized;
           saveProfile();
+          updateMenuAvatar();
           renderDrawerContent();
         });
       };
@@ -1741,6 +1920,45 @@
         profile.theme = btn.getAttribute("data-theme");
         applyTheme(profile.theme);
         saveProfile();
+        renderDrawerContent();
+      });
+    });
+  }
+
+  /* ---------- Avatar choice modal (animal preset vs. photo) ---------- */
+  function openAvatarChoiceModal() {
+    renderAvatarChoiceStep1();
+    document.getElementById("avatarChoiceModalBackdrop").classList.remove("hidden");
+  }
+  function closeAvatarChoiceModal() {
+    document.getElementById("avatarChoiceModalBackdrop").classList.add("hidden");
+  }
+  function renderAvatarChoiceStep1() {
+    var content = document.getElementById("avatarChoiceContent");
+    content.innerHTML =
+      '<button class="avatar-choice-btn" id="avatarChoicePhotoBtn"><span class="avatar-choice-emoji">📷</span><span>Take or choose a photo</span></button>' +
+      '<button class="avatar-choice-btn" id="avatarChoiceAnimalBtn"><span class="avatar-choice-emoji">🐾</span><span>Pick an animal avatar</span></button>';
+    document.getElementById("avatarChoicePhotoBtn").addEventListener("click", function () {
+      closeAvatarChoiceModal();
+      document.getElementById("avatarFileInput").click();
+    });
+    document.getElementById("avatarChoiceAnimalBtn").addEventListener("click", renderAvatarChoiceStep2);
+  }
+  function renderAvatarChoiceStep2() {
+    var content = document.getElementById("avatarChoiceContent");
+    var html = '<div class="avatar-preset-grid">';
+    AVATAR_PRESETS.forEach(function (emoji) {
+      var active = profile.avatar === emoji;
+      html += '<button class="avatar-preset-btn' + (active ? " active" : "") + '" data-avatar-emoji="' + emoji + '">' + emoji + '</button>';
+    });
+    html += "</div>";
+    content.innerHTML = html;
+    content.querySelectorAll("[data-avatar-emoji]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        profile.avatar = btn.getAttribute("data-avatar-emoji");
+        saveProfile();
+        updateMenuAvatar();
+        closeAvatarChoiceModal();
         renderDrawerContent();
       });
     });
@@ -2631,6 +2849,7 @@
   function init() {
     loadData();
     loadProfile();
+    updateMenuAvatar();
     loadLifetime();
     document.getElementById("notesInput").value = state.notes;
 
@@ -2638,12 +2857,16 @@
     document.getElementById("drawerBackdrop").addEventListener("click", function (e) { if (e.target === this) closeDrawer(); });
     document.getElementById("headerCenterBtn").addEventListener("click", openJumpToWeekPicker);
     document.getElementById("statsBtn").addEventListener("click", openStatsModal);
-    document.getElementById("shareBtn").addEventListener("click", shareWeek);
     document.getElementById("loadMoreWeekBtn").addEventListener("click", function () {
       state.multiWeekMode = !state.multiWeekMode;
       document.getElementById("loadMoreWeekBtn").classList.toggle("active", state.multiWeekMode);
       render();
     });
+    document.getElementById("filterSummaryBtn").addEventListener("click", openCategoryFilterModal);
+    document.getElementById("categoryFilterModalClose").addEventListener("click", closeCategoryFilterModal);
+    document.getElementById("categoryFilterModalBackdrop").addEventListener("click", function (e) { if (e.target === this) closeCategoryFilterModal(); });
+    document.getElementById("avatarChoiceModalClose").addEventListener("click", closeAvatarChoiceModal);
+    document.getElementById("avatarChoiceModalBackdrop").addEventListener("click", function (e) { if (e.target === this) closeAvatarChoiceModal(); });
     document.getElementById("selectModeBtn").addEventListener("click", toggleSelectionMode);
     document.getElementById("selectCancelBtn").addEventListener("click", exitSelectionMode);
     document.getElementById("selectDeleteBtn").addEventListener("click", bulkDeleteTasks);
@@ -2661,7 +2884,11 @@
       state.sortByPriority = !state.sortByPriority;
       render();
     });
-    document.getElementById("todayBtn").addEventListener("click", function () {
+    document.getElementById("todayBtnLeft").addEventListener("click", function () {
+      state.weekOffset = 0;
+      render();
+    });
+    document.getElementById("todayBtnRight").addEventListener("click", function () {
       state.weekOffset = 0;
       render();
     });
@@ -2669,10 +2896,22 @@
     document.getElementById("nextWeekBtn").addEventListener("click", function () { state.weekOffset++; render(); });
 
     var notesTimer = null;
-    document.getElementById("notesInput").addEventListener("input", function (e) {
+    var notesInput = document.getElementById("notesInput");
+    notesInput.addEventListener("input", function (e) {
       var val = e.target.value;
       if (notesTimer) clearTimeout(notesTimer);
       notesTimer = setTimeout(function () { saveNotes(val); }, 500);
+      // Keep the expanded height in sync as the person types/deletes lines.
+      if (isNotesExpanded) expandNotes();
+    });
+    notesInput.addEventListener("focus", function () { expandNotes(); });
+    notesInput.addEventListener("blur", function () { collapseNotes(); });
+    document.getElementById("notesDeleteAllBtn").addEventListener("pointerdown", function (e) {
+      e.preventDefault(); // keep focus on the textarea so it doesn't collapse before the click registers
+    });
+    document.getElementById("notesDeleteAllBtn").addEventListener("click", function (e) {
+      e.stopPropagation();
+      requestDeleteAllNotes();
     });
 
     // Task modal wiring
@@ -2733,11 +2972,24 @@
 
     document.addEventListener("keydown", function (e) {
       if (e.key !== "Escape") return;
-      closeTaskModal(); closeDayPicker(); closeStatsModal(); closeBulkMoveModal(); closeDrawer(); cancelConfirm();
+      closeTaskModal(); closeDayPicker(); closeStatsModal(); closeBulkMoveModal(); closeDrawer(); closeCategoryFilterModal(); closeAvatarChoiceModal(); cancelConfirm();
     });
 
     render();
   }
+
+  // iOS Safari's 100dvh occasionally under-reports the true visible height
+  // right after load or a keyboard/orientation change. Measuring the real
+  // viewport in JS and feeding it back as a CSS var is the standard,
+  // reliable fix - it guarantees the app always fills the actual screen.
+  function setAppHeightVar() {
+    var h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    document.documentElement.style.setProperty("--app-height", h + "px");
+  }
+  setAppHeightVar();
+  window.addEventListener("resize", setAppHeightVar);
+  window.addEventListener("orientationchange", setAppHeightVar);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", setAppHeightVar);
 
   document.addEventListener("DOMContentLoaded", init);
 })();
