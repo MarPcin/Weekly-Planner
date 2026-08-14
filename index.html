@@ -29,7 +29,7 @@
     --priority-standard: #F0F0FF;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0;
     background: var(--bg);
@@ -39,8 +39,9 @@
   }
   button, input, textarea { font-family: inherit; color: inherit; }
   .hidden { display: none !important; }
-  button { transition: transform .1s ease, opacity .1s ease; }
+  button { transition: transform .1s ease, opacity .1s ease; -webkit-tap-highlight-color: transparent; }
   button:active { transform: scale(0.94); opacity: 0.8; }
+  .task-title:active { transform: none; opacity: 1; }
   button { cursor: pointer; background: none; border: none; }
   #app {
     display: flex;
@@ -464,7 +465,7 @@
     padding: 4px 9px; border-radius: 8px;
   }
   .notes-textarea {
-    width: 100%; height: 78px; resize: none;
+    width: 100%; height: 46px; resize: none;
     background: none; border: none; outline: none;
     font-size: 16px; color: var(--text); line-height: 22px;
     transition: height .25s ease;
@@ -990,7 +991,7 @@
   }
 
   var isNotesExpanded = false;
-  var NOTES_COLLAPSED_HEIGHT = 78;
+  var NOTES_COLLAPSED_HEIGHT = 46;
 
   function expandNotes() {
     var ta = document.getElementById("notesInput");
@@ -1190,7 +1191,9 @@
     var todayRight = document.getElementById("todayBtnRight");
     todayLeft.style.display = state.weekOffset > 0 ? "flex" : "none";
     todayRight.style.display = state.weekOffset < 0 ? "flex" : "none";
-    document.getElementById("sortBtn").classList.toggle("active", state.sortByPriority);
+    // Sort intentionally has no persistent highlight - only select-mode
+    // (☑️) and load-more-week (📃) keep a lasting "on" indicator; every
+    // other button just shows the momentary press animation.
   }
 
   function updateMenuAvatar() {
@@ -2990,6 +2993,12 @@
   window.addEventListener("resize", setAppHeightVar);
   window.addEventListener("orientationchange", setAppHeightVar);
   if (window.visualViewport) window.visualViewport.addEventListener("resize", setAppHeightVar);
+
+  // iOS Safari otherwise applies :active press styles inconsistently (and
+  // sometimes leaves them "stuck" after the finger lifts) unless something
+  // in the document is listening for touch events. An empty listener is
+  // the standard, harmless fix.
+  document.addEventListener("touchstart", function () {}, true);
 
   document.addEventListener("DOMContentLoaded", init);
 })();
